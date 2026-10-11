@@ -1,0 +1,1145 @@
+<title>Airbox-Strömungsanalyse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: Werkbank – Schrittfolge links, 3D-Ansicht rechts, darunter Messprotokoll mit Karten und Variantenvergleich */
+:root{
+  --bg:#e7ebee; --surface:#f5f7f8; --sunk:#dde3e7; --stage:#d6dde2; --fg:#182026; --muted:#55616b; --line:#c1cbd2;
+  --accent:#c2620a; --accent-fg:#ffffff; --good:#2f7d4f; --warn:#b07a12; --bad:#b23a2e; --pick:#1f8f6a; --seal:#d4a017;
+  --f-display:"Barlow Semi Condensed","Arial Narrow",sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101417; --surface:#171d21; --sunk:#0d1114; --stage:#0b0f12; --fg:#e1e6ea; --muted:#93a0aa; --line:#2a333a;
+  --accent:#f0a03a; --accent-fg:#101417; --good:#5cbf86; --warn:#e2b04a; --bad:#ef7a6c; --pick:#3fd1a0; --seal:#f2c84b;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101417; --surface:#171d21; --sunk:#0d1114; --stage:#0b0f12; --fg:#e1e6ea; --muted:#93a0aa; --line:#2a333a;
+  --accent:#f0a03a; --accent-fg:#101417; --good:#5cbf86; --warn:#e2b04a; --bad:#ef7a6c; --pick:#3fd1a0; --seal:#f2c84b;
+  color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.wrap{max-width:1360px;margin:0 auto;padding-inline:18px;padding-block:16px 32px;display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 20px;border-bottom:1px solid var(--line);padding-bottom:10px}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(1.5rem,3vw,2.1rem);margin:0;letter-spacing:.01em;text-wrap:balance}
+.tag{font-family:var(--f-mono);font-size:.76rem;color:var(--muted)}
+.grid{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:960px){.grid{grid-template-columns:minmax(0,1fr)}}
+.steps{display:flex;flex-direction:column;gap:10px;min-width:0}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:9px}
+.step[data-state="locked"]{opacity:.5}
+.step[data-state="done"] .num{background:var(--good);color:var(--accent-fg);border-color:var(--good)}
+.step h2{display:flex;align-items:center;gap:9px;margin:0;font-family:var(--f-display);font-weight:600;font-size:1.08rem;letter-spacing:.02em}
+.num{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;border:1.5px solid var(--muted);font-family:var(--f-mono);font-size:.8rem;flex:none}
+.step p{margin:0;font-size:.9rem;color:var(--muted)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.field{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:8px;align-items:center;font-size:.9rem}
+.field label{color:var(--muted)}
+input[type=number],select{font:inherit;font-size:.9rem;padding:5px 7px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--fg);width:100%;min-width:0}
+input[type=number]{font-family:var(--f-mono);font-size:.84rem}
+button{font-family:var(--f-display);font-weight:600;font-size:.95rem;letter-spacing:.03em;padding:6px 12px;border-radius:4px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+button[aria-pressed="true"]{outline:2px solid var(--pick);outline-offset:1px}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.drop{border:1.5px dashed var(--line);border-radius:6px;padding:14px;text-align:center;font-size:.9rem;color:var(--muted);cursor:pointer}
+.drop.over{border-color:var(--accent);color:var(--fg)}
+.facts{display:grid;grid-template-columns:auto auto;gap:3px 12px;font-size:.86rem;margin:0}
+.facts dt{color:var(--muted)} .facts dd{margin:0;text-align:right;font-family:var(--f-mono);font-size:.8rem;font-variant-numeric:tabular-nums}
+.msg{font-size:.86rem;padding:7px 9px;border-radius:4px;background:var(--sunk);border-left:3px solid var(--muted)}
+.msg.err{border-left-color:var(--bad)} .msg.ok{border-left-color:var(--good)} .msg.info{border-left-color:var(--accent)}
+details summary{cursor:pointer;font-size:.88rem;color:var(--muted)}
+details[open]{display:flex;flex-direction:column;gap:7px}
+.viewer{position:relative;background:var(--stage);border:1px solid var(--line);border-radius:6px;height:clamp(380px,64vh,720px);overflow:hidden;min-width:0}
+#c3d{display:block;width:100%;height:100%;touch-action:none}
+.vhint{position:absolute;left:10px;top:10px;right:10px;display:flex;justify-content:space-between;gap:8px;pointer-events:none;font-size:.8rem}
+.vhint span{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:4px 8px;color:var(--muted)}
+.vhint .pickmode{color:var(--fg);border-color:var(--pick)}
+.axes{font-family:var(--f-mono)}
+.prog{display:flex;flex-direction:column;gap:6px}
+.bar{height:8px;border-radius:4px;background:var(--sunk);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.mono{font-family:var(--f-mono);font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.results{display:flex;flex-direction:column;gap:14px}
+.results[hidden]{display:none!important}
+.sec-h{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 14px;border-bottom:1px solid var(--line);padding-bottom:6px}
+.sec-h h2{font-family:var(--f-display);font-weight:700;font-size:1.35rem;margin:0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.kpi b{font-family:var(--f-display);font-size:1.7rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi span{font-size:.82rem;color:var(--muted)}
+.chip{display:inline-block;font-family:var(--f-display);font-weight:600;font-size:.82rem;letter-spacing:.04em;padding:1px 8px;border-radius:10px;border:1px solid currentColor;width:max-content}
+.chip.good{color:var(--good)} .chip.warn{color:var(--warn)} .chip.bad{color:var(--bad)}
+.maps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:820px){.maps{grid-template-columns:minmax(0,1fr)}}
+figure{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:0}
+figcaption{font-family:var(--f-display);font-weight:600;font-size:1rem}
+figcaption small{display:block;font-family:var(--f-body);font-weight:400;font-size:.82rem;color:var(--muted)}
+figure canvas{width:100%;display:block}
+.two{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px}
+@media (max-width:820px){.two{grid-template-columns:minmax(0,1fr)}}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:.86rem}
+th,td{padding:7px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{font-family:var(--f-display);font-weight:600;letter-spacing:.03em;color:var(--muted)}
+td{font-family:var(--f-mono);font-size:.8rem;font-variant-numeric:tabular-nums}
+tr.sel td{background:var(--sunk)}
+tbody tr{cursor:pointer}
+.calc{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.calc h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:1.05rem}
+.note{font-size:.84rem;color:var(--muted);margin:0;max-width:75ch}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Airbox-Strömungsanalyse</h1>
+    <span class="tag" id="gpuTag">Rechenwerk wird erkannt …</span>
+  </header>
+
+  <div class="grid">
+    <div class="steps">
+      <section class="step" id="s1" data-state="open">
+        <h2><span class="num">1</span>Modell laden</h2>
+        <label class="drop" id="drop" for="file">STL-Datei hierher ziehen oder <u>auswählen</u><br><small>Unterteil als geschlossener Körper, Einheit mm</small></label>
+        <input type="file" id="file" accept=".stl" hidden>
+        <dl class="facts" id="modelFacts" hidden></dl>
+      </section>
+
+      <section class="step" id="s2" data-state="locked">
+        <h2><span class="num">2</span>Filter-Dichtebene</h2>
+        <p>Klicke auf die Auflagefläche der Filterdichtung (Flansch). Die Ebene muss senkrecht zu einer Achse liegen.</p>
+        <div class="row"><button id="pickSeal" aria-pressed="false">Fläche anklicken</button></div>
+        <div class="field"><label for="sealCoord">Lage der Ebene [mm]</label><input type="number" id="sealCoord" step="0.5"></div>
+        <div class="field"><label for="pleat">Faltentiefe unter der Ebene [mm]</label><input type="number" id="pleat" value="40" min="5" max="150" step="1"></div>
+        <div class="mono" id="sealInfo">Noch nicht festgelegt</div>
+      </section>
+
+      <section class="step" id="s3" data-state="locked">
+        <h2><span class="num">3</span>Einlass</h2>
+        <p>Klicke auf die Außenwand direkt neben der Einlassöffnung (oder auf den Rand des Stutzens). Gewählt wird die Öffnung, die dem Klickpunkt am nächsten liegt.</p>
+        <div class="row"><button id="pickInlet" aria-pressed="false">Wand am Einlass anklicken</button></div>
+        <div class="mono" id="inletInfo">Noch nicht festgelegt</div>
+      </section>
+
+      <section class="step" id="s4" data-state="locked">
+        <h2><span class="num">4</span>Berechnen</h2>
+        <div class="field"><label for="dx">Zellgröße</label>
+          <select id="dx"><option value="4">4 mm · schnell</option><option value="3" selected>3 mm · Standard</option><option value="2.5">2,5 mm · fein</option><option value="2">2 mm · sehr fein</option></select></div>
+        <div class="field"><label for="filterType">Filter</label>
+          <select id="filterType"><option value="3" selected>Papierfilter neu</option><option value="6">Papierfilter verschmutzt</option><option value="1.5">Sportfilter / Baumwolle</option></select></div>
+        <div class="field"><label for="device">Rechenwerk</label>
+          <select id="device"><option value="auto">Grafikkarte, sonst Prozessor</option><option value="cpu">Nur Prozessor</option></select></div>
+        <details>
+          <summary>Erweiterte Einstellungen</summary>
+          <div class="field"><label for="K">Filterwiderstand K (Δp Filter / Staudruck)</label><input type="number" id="K" value="3" step="0.1" min="0.2"></div>
+          <div class="field"><label for="aniso">Widerstand quer zu den Falten</label><input type="number" id="aniso" value="10" step="1" min="1"></div>
+          <div class="field"><label for="steps">Rechenschritte</label><input type="number" id="steps" value="5000" step="500" min="500"></div>
+          <div class="field"><label for="tau">Viskosität τ</label><input type="number" id="tau" value="0.51" step="0.005" min="0.502"></div>
+          <div class="field"><label for="u">Einlassgeschw. (Gitter)</label><input type="number" id="u" value="0.06" step="0.01" min="0.02" max="0.1"></div>
+        </details>
+        <dl class="facts" id="geoFacts" hidden></dl>
+        <div class="row"><button class="primary" id="run" disabled>Rechnung starten</button><button id="cancel" hidden>Abbrechen</button></div>
+        <div class="prog" id="prog" hidden>
+          <div class="bar"><i id="barFill"></i></div>
+          <div class="mono" id="progText"></div>
+        </div>
+        <div class="msg" id="status" hidden></div>
+      </section>
+    </div>
+
+    <div class="viewer">
+      <canvas id="c3d" aria-label="3D-Ansicht des Modells"></canvas>
+      <div class="vhint"><span id="vmode">Ziehen = drehen · Scrollen = zoomen · Rechtsklick = verschieben</span><span class="axes">X rot · Y grün · Z blau</span></div>
+    </div>
+  </div>
+
+  <section class="results" id="results" hidden>
+    <div class="sec-h"><h2>Ergebnis</h2><span class="mono" id="resMeta"></span></div>
+    <div class="kpis" id="kpis"></div>
+    <div class="maps">
+      <figure><figcaption>Filteranströmung<small>Mitte Faltenpaket, relativ zum Mittelwert. Blau = unterversorgt, Rot = Strahl.</small></figcaption><canvas id="m1"></canvas></figure>
+      <figure><figcaption>Geschwindigkeit auf Einlasshöhe<small id="m2s"></small></figcaption><canvas id="m2"></canvas></figure>
+      <figure><figcaption>Geschwindigkeit unter den Falten<small id="m3s"></small></figcaption><canvas id="m3"></canvas></figure>
+      <figure><figcaption>Längsschnitt durch die Einlassmitte<small id="m4s"></small></figcaption><canvas id="m4"></canvas></figure>
+    </div>
+    <div class="two">
+      <div class="tbl">
+        <table>
+          <thead><tr><th>Variante</th><th>γ Kern</th><th>&lt; 50 %</th><th>Max/Mittel</th><th>ζ</th><th>Einlass</th><th>Rechenwerk</th><th>Dauer</th></tr></thead>
+          <tbody id="runs"></tbody>
+        </table>
+      </div>
+      <div class="calc">
+        <h3>Leistungsrechner</h3>
+        <div class="field"><label for="ps">Motorleistung [PS]</label><input type="number" id="ps" value="150" step="10" min="30"></div>
+        <dl class="facts" id="calcOut"></dl>
+        <p class="note">Benzin-Turbo, rund 0,8 g/s Luft pro PS. Druckverlust nur Rohluftseite ohne Filter und Schlauch, aus ζ der gewählten Variante.</p>
+      </div>
+    </div>
+    <p class="note">Die Rechnung läuft bei kleinerer Reynoldszahl als im Auto, mit Turbulenzmodell. Die Werte eignen sich zum Vergleich von Varianten, nicht als exakte Absolutwerte. γ Kern: Gleichförmigkeitsindex ohne die wandnahe Randzelle (1 = perfekt gleichmäßig, ab 0,9 gut).</p>
+  </section>
+</div>
+
+<script type="text/plain" id="engine-src">/* Airbox-Stroemungskern: Voxelisierung + Lattice-Boltzmann D3Q19 (laeuft im Web Worker oder in Node) */
+"use strict";
+const CX = [0, 1, -1, 0, 0, 0, 0, 1, -1, 1, -1, 1, -1, 1, -1, 0, 0, 0, 0];
+const CY = [0, 0, 0, 1, -1, 0, 0, 1, -1, -1, 1, 0, 0, 0, 0, 1, -1, 1, -1];
+const CZ = [0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 1, -1, -1, 1, 1, -1, -1, 1];
+const WT = [1 / 3, 1 / 18, 1 / 18, 1 / 18, 1 / 18, 1 / 18, 1 / 18,
+  1 / 36, 1 / 36, 1 / 36, 1 / 36, 1 / 36, 1 / 36, 1 / 36, 1 / 36, 1 / 36, 1 / 36, 1 / 36, 1 / 36];
+const OPP = [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15, 18, 17];
+const CXf = Float64Array.from(CX), CYf = Float64Array.from(CY), CZf = Float64Array.from(CZ);
+const XX = CXf.map((c) => c * c), YY = CYf.map((c) => c * c), ZZ = CZf.map((c) => c * c);
+const XY = CXf.map((c, i) => c * CYf[i]), XZ = CXf.map((c, i) => c * CZf[i]), YZ = CYf.map((c, i) => c * CZf[i]);
+const firstGE = (arr, v) => { const r = arr.findIndex((d) => d >= v); return r < 0 ? arr.length - 1 : r; };
+
+function parseSTL(buf) {
+  const dv = new DataView(buf);
+  const n = buf.byteLength >= 84 ? dv.getUint32(80, true) : 0;
+  if (n > 0 && 84 + 50 * n === buf.byteLength) {
+    const t = new Float32Array(n * 9);
+    for (let i = 0; i < n; i++) for (let k = 0; k < 9; k++) t[i * 9 + k] = dv.getFloat32(84 + i * 50 + 12 + k * 4, true);
+    return t;
+  }
+  const txt = new TextDecoder().decode(new Uint8Array(buf));
+  const re = /vertex\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)/g; const v = []; let m;
+  while ((m = re.exec(txt))) v.push(+m[1], +m[2], +m[3]);
+  if (v.length < 9) throw new Error("STL enthält keine Dreiecke.");
+  return new Float32Array(v);
+}
+
+// Lokales System: X = freie Achse, D = Tiefe ab Dichtebene (in den Kasten), Z = ab Einlassseite nach innen
+function makeFrame(p) {
+  const dAx = p.sealAxis, iAx = p.inletAxis;
+  if (dAx === iAx) throw new Error("Einlassseite und Filterebene liegen auf derselben Achse.");
+  const oAx = 3 - dAx - iAx, sd = p.sealSign, si = p.inletSign, seal = p.seal;
+  return {
+    dAx, iAx, oAx, sd, si, seal,
+    toLocal: (q) => [q[oAx], -sd * (q[dAx] - seal), -si * q[iAx]],
+    toModel: (X, D, Z) => { const q = [0, 0, 0]; q[oAx] = X; q[dAx] = seal - sd * D; q[iAx] = -si * Z; return q; },
+  };
+}
+
+function voxelize(T, origin, nx, ny, nz, h) {
+  const ncol = nx * ny, cnt = new Int32Array(ncol + 1), ntri = T.length / 9;
+  const jx = 1.37e-4, jy = 2.71e-4;
+  // zwei Durchlaeufe: zaehlen, dann sammeln
+  const passes = [null, null]; let hits = null, pos = null;
+  for (let pass = 0; pass < 2; pass++) {
+    for (let t = 0; t < ntri; t++) {
+      const o = t * 9;
+      const ax = T[o] - origin[0] - jx, ay = T[o + 1] - origin[1] - jy, az = T[o + 2] - origin[2];
+      const bx = T[o + 3] - origin[0] - jx, by = T[o + 4] - origin[1] - jy, bz = T[o + 5] - origin[2];
+      const cx = T[o + 6] - origin[0] - jx, cy = T[o + 7] - origin[1] - jy, cz = T[o + 8] - origin[2];
+      const den = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
+      if (Math.abs(den) < 1e-12) continue;
+      const i0 = Math.max(0, Math.floor(Math.min(ax, bx, cx) / h - 0.5)), i1 = Math.min(nx - 1, Math.ceil(Math.max(ax, bx, cx) / h - 0.5));
+      const j0 = Math.max(0, Math.floor(Math.min(ay, by, cy) / h - 0.5)), j1 = Math.min(ny - 1, Math.ceil(Math.max(ay, by, cy) / h - 0.5));
+      for (let i = i0; i <= i1; i++) {
+        const px = (i + 0.5) * h;
+        for (let j = j0; j <= j1; j++) {
+          const py = (j + 0.5) * h;
+          const l1 = ((by - cy) * (px - cx) + (cx - bx) * (py - cy)) / den;
+          if (l1 < 0) continue;
+          const l2 = ((cy - ay) * (px - cx) + (ax - cx) * (py - cy)) / den;
+          if (l2 < 0) continue;
+          const l3 = 1 - l1 - l2;
+          if (l3 < 0) continue;
+          const col = i * ny + j;
+          if (pass === 0) cnt[col + 1]++;
+          else hits[pos[col]++] = l1 * az + l2 * bz + l3 * cz;
+        }
+      }
+    }
+    if (pass === 0) {
+      for (let c = 0; c < ncol; c++) cnt[c + 1] += cnt[c];
+      hits = new Float32Array(cnt[ncol]); pos = Int32Array.from(cnt.subarray(0, ncol));
+    }
+  }
+  const vox = new Uint8Array(nx * ny * nz);
+  for (let c = 0; c < ncol; c++) {
+    const a = cnt[c], b = cnt[c + 1];
+    if (b - a < 2) continue;
+    const zs = Array.from(hits.subarray(a, b)).sort((p, q) => p - q);
+    const m = zs.length - (zs.length % 2), base = c * nz;
+    for (let k = 0; k < m; k += 2) {
+      const k0 = Math.max(0, Math.ceil(zs[k] / h - 0.5)), k1 = Math.min(nz - 1, Math.ceil(zs[k + 1] / h - 0.5) - 1);
+      for (let kk = k0; kk <= k1; kk++) vox[base + kk] = 1;
+    }
+  }
+  return vox;
+}
+
+function components2d(mask, nx, ny) {
+  const lab = new Int32Array(nx * ny).fill(-1), comps = []; const q = new Int32Array(nx * ny);
+  for (let s = 0; s < nx * ny; s++) {
+    if (!mask[s] || lab[s] >= 0) continue;
+    const id = comps.length; let qh = 0, qt = 0; q[qt++] = s; lab[s] = id; const cells = [];
+    while (qh < qt) {
+      const c = q[qh++]; cells.push(c); const i = (c / ny) | 0, j = c % ny;
+      const nb = [i > 0 ? c - ny : -1, i < nx - 1 ? c + ny : -1, j > 0 ? c - 1 : -1, j < ny - 1 ? c + 1 : -1];
+      for (const d of nb) if (d >= 0 && mask[d] && lab[d] < 0) { lab[d] = id; q[qt++] = d; }
+    }
+    comps.push(cells);
+  }
+  return comps;
+}
+
+/* Geometrie vorbereiten. p: {tris, dx, sealAxis, sealSign, seal, inletAxis, inletSign, click, pleat} */
+function prepare(p) {
+  const fr = makeFrame(p), T0 = p.tris, ntri = T0.length / 9;
+  const T = new Float32Array(T0.length);
+  const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (let v = 0; v < ntri * 3; v++) {
+    const L = fr.toLocal([T0[v * 3], T0[v * 3 + 1], T0[v * 3 + 2]]);
+    for (let a = 0; a < 3; a++) { T[v * 3 + a] = L[a]; if (L[a] < mn[a]) mn[a] = L[a]; if (L[a] > mx[a]) mx[a] = L[a]; }
+  }
+  const h = p.dx, sub = 3, hf = h / sub, duct = 10;
+  const origin = [mn[0] - h, mn[1] - h, mn[2] - duct * h];
+  const nx = Math.ceil((mx[0] - origin[0] + h) / h), ny = Math.ceil((mx[1] - origin[1] + h) / h), nz = Math.ceil((mx[2] - origin[2] + h) / h);
+  const N = nx * ny * nz;
+  if (N > 4.5e6) throw new Error(`Gitter zu groß (${(N / 1e6).toFixed(1)} Mio. Zellen) – Zellgröße erhöhen.`);
+  const nxf = nx * sub, nyf = ny * sub, nzf = nz * sub;
+  const fine = voxelize(T, origin, nxf, nyf, nzf, hf);
+  const solid = new Uint8Array(N);
+  for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) for (let k = 0; k < nz; k++) {
+    let s = 0;
+    for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) {
+      const base = ((i * 3 + a) * nyf + (j * 3 + b)) * nzf + k * 3;
+      s += fine[base] + fine[base + 1] + fine[base + 2];
+    }
+    if (s >= 7) solid[(i * ny + j) * nz + k] = 1;
+  }
+  const xc = new Float32Array(nx), dc = new Float32Array(ny), zc = new Float32Array(nz);
+  for (let i = 0; i < nx; i++) xc[i] = origin[0] + (i + 0.5) * h;
+  for (let j = 0; j < ny; j++) dc[j] = origin[1] + (j + 0.5) * h;
+  for (let k = 0; k < nz; k++) zc[k] = origin[2] + (k + 0.5) * h;
+
+  // Oeffnungen: Loecher in der vordersten Materialschicht
+  const kf = Math.floor((mn[2] + 1.5 - origin[2]) / hf);
+  const empty = new Uint8Array(nxf * nyf);
+  for (let i = 0; i < nxf; i++) for (let j = 0; j < nyf; j++) empty[i * nyf + j] = fine[(i * nyf + j) * nzf + kf] ? 0 : 1;
+  const outside = new Uint8Array(nxf * nyf), q = new Int32Array(nxf * nyf); let qh = 0, qt = 0;
+  const push = (c) => { if (empty[c] && !outside[c]) { outside[c] = 1; q[qt++] = c; } };
+  for (let i = 0; i < nxf; i++) { push(i * nyf); push(i * nyf + nyf - 1); }
+  for (let j = 0; j < nyf; j++) { push(j); push((nxf - 1) * nyf + j); }
+  while (qh < qt) {
+    const c = q[qh++], i = (c / nyf) | 0, j = c % nyf;
+    if (i > 0) push(c - nyf); if (i < nxf - 1) push(c + nyf); if (j > 0) push(c - 1); if (j < nyf - 1) push(c + 1);
+  }
+  const holes = new Uint8Array(nxf * nyf);
+  for (let c = 0; c < holes.length; c++) holes[c] = empty[c] && !outside[c] && (origin[1] + ((c % nyf) + 0.5) * hf > 0) ? 1 : 0;
+  const comps = components2d(holes, nxf, nyf).filter((c) => c.length * hf * hf > 25);
+  if (!comps.length) throw new Error("Auf der gewählten Einlassseite wurde keine Öffnung gefunden.");
+  let best = comps[0];
+  if (p.click) {
+    const L = fr.toLocal(p.click); let bd = Infinity;
+    for (const c of comps) {
+      for (let s = 0; s < c.length; s += 3) {
+        const x = origin[0] + ((c[s] / nyf | 0) + 0.5) * hf, y = origin[1] + (c[s] % nyf + 0.5) * hf;
+        const d = (x - L[0]) ** 2 + (y - L[1]) ** 2; if (d < bd) { bd = d; best = c; }
+      }
+    }
+  } else best = comps.reduce((a, b) => (b.length > a.length ? b : a));
+  const sel = new Uint8Array(nx * ny);
+  for (const c of best) sel[((c / nyf | 0) / 3 | 0) * ny + ((c % nyf) / 3 | 0)]++;
+  const opening = new Uint8Array(nx * ny); let nOpen = 0;
+  for (let c = 0; c < nx * ny; c++) if (sel[c] >= 5) { opening[c] = 1; nOpen++; }
+  if (nOpen < 8) throw new Error("Einlassöffnung ist zu klein für die gewählte Zellgröße.");
+
+  // Einlassrohr, Boden schliessen, Auslassebene
+  const kw0 = zc.findIndex((z) => z >= mn[2]);
+  for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) for (let k = 0; k < kw0; k++)
+    solid[(i * ny + j) * nz + k] = opening[i * ny + j] ? 0 : 1;
+  for (let j = 0; j < ny; j++) if (dc[j] > mx[1] - 0.5 * h)
+    for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) solid[(i * ny + j) * nz + k] = 1;
+  const top = dc.findIndex((d) => d >= 0);
+  if (top < 0) throw new Error("Dichtebene liegt außerhalb des Modells.");
+  const fluid = new Uint8Array(N); const Q = new Int32Array(N); qh = 0; qt = 0;
+  const visit = (c, j) => { if (!fluid[c] && !solid[c] && j >= top) { fluid[c] = 1; Q[qt++] = c; } };
+  for (let c = 0; c < nx * ny; c++) if (opening[c]) visit(c * nz, c % ny);
+  while (qh < qt) {
+    const c = Q[qh++], k = c % nz, ij = (c / nz) | 0, j = ij % ny, i = (ij / ny) | 0;
+    if (i > 0) visit(c - ny * nz, j); if (i < nx - 1) visit(c + ny * nz, j);
+    if (j > 0) visit(c - nz, j - 1); if (j < ny - 1) visit(c + nz, j + 1);
+    if (k > 0) visit(c - 1, j); if (k < nz - 1) visit(c + 1, j);
+  }
+  const nf = qt;
+  const jm = firstGE(dc, p.pleat / 2);
+  let Af = 0; for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) Af += fluid[(i * ny + jm) * nz + k];
+  // Vorschau-Punkte der Oeffnung (Modellkoordinaten)
+  const openPts = [];
+  for (let c = 0; c < nx * ny; c++) if (opening[c]) {
+    const m = fr.toModel(xc[(c / ny) | 0], dc[c % ny], mn[2]); openPts.push(m[0], m[1], m[2]);
+  }
+  let leak = 0; for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) leak += fluid[(i * ny + top) * nz + k];
+  return {
+    fr, h, nx, ny, nz, N, xc, dc, zc, solid, fluid, opening, top, jm, nf, mn, mx, pleat: p.pleat,
+    summary: {
+      grid: [nx, ny, nz], cells: nf, volume_l: nf * h ** 3 / 1e6, inlet_cm2: nOpen * h * h / 100,
+      filter_cm2: Af * h * h / 100, outlet_cm2: leak * h * h / 100, nHoles: comps.length, openPts,
+      pleatOk: jm > top,
+    },
+  };
+}
+
+/* ---------------------------------------------------------------- Lattice-Boltzmann
+   p = {K, aniso, u, tau, steps, avg, every} */
+function setupSim(g, p) {
+  const { ny, nz, N, fluid, opening, top, dc } = g;
+  const NF = g.nf, cid = new Int32Array(N).fill(-1), cells = new Int32Array(NF);
+  let m = 0; for (let c = 0; c < N; c++) if (fluid[c]) { cid[c] = m; cells[m++] = c; }
+  const off = CX.map((_, i) => (CX[i] * ny + CY[i]) * nz + CZ[i]);
+  const nb = new Int32Array(NF * 19), flag = new Uint32Array(NF);  // 1 Einlass, 2 Auslass, 3 Filter
+  const jsOf = new Int32Array(NF);
+  let Ain = 0, Lp = 0;
+  for (let j = 0; j < g.ny; j++) if (dc[j] > dc[top] && dc[j] <= g.pleat) Lp++;
+  for (let a = 0; a < NF; a++) {
+    const c = cells[a], k = c % nz, ij = (c / nz) | 0, j = ij % ny;
+    jsOf[a] = j;
+    for (let i = 0; i < 19; i++) { const s = c - off[i]; nb[a * 19 + i] = s >= 0 && s < N ? cid[s] : -1; }
+    if (k === 0 && opening[ij]) { flag[a] = 1; Ain++; }
+    else if (j === top) flag[a] = 2;
+    else if (dc[j] > dc[top] && dc[j] <= g.pleat) flag[a] = 3;
+  }
+  const layerM = [], layerT = [];
+  for (let a = 0; a < NF; a++) { if (jsOf[a] === g.jm) layerM.push(a); if (jsOf[a] === top + 1) layerT.push(a); }
+  const Af = layerM.length;
+  const u0 = p.u, uface = u0 * Ain / Af, sig = p.K * 0.5 * u0 * u0 / (uface * Math.max(Lp, 1));
+  const f0 = new Float32Array(19 * NF);
+  for (let i = 0; i < 19; i++) f0.fill(WT[i], i * NF, (i + 1) * NF);
+  return { NF, cid, cells, nb, flag, Ain, Af, sig, layerM, layerT, f0,
+    u0, tau0: p.tau, aniso: p.aniso, cs2s: 18 * Math.SQRT2 * 0.17 * 0.17 };
+}
+
+function cpuStep(S, f, f2, acc) {
+  const { NF, nb, flag, u0, tau0, sig, aniso, cs2s } = S;
+  const fi = S._fi || (S._fi = new Float64Array(19)), fe = S._fe || (S._fe = new Float64Array(19));
+  for (let a = 0; a < NF; a++) {
+    const base = a * 19;
+    let rho = 0, mx = 0, my = 0, mz = 0;
+    for (let i = 0; i < 19; i++) {
+      const s = nb[base + i];
+      const v = s >= 0 ? f[i * NF + s] : f[OPP[i] * NF + a];
+      fi[i] = v; rho += v; mx += CX[i] * v; my += CY[i] * v; mz += CZ[i] * v;
+    }
+    let ux = mx / rho, uy = my / rho, uz = mz / rho;
+    const fl = flag[a];
+    if (fl === 1 || fl === 2) {
+      if (fl === 1) {
+        // Dichte aus den Populationen, die aus dem Innenraum kommen (Zou/He-Ansatz)
+        let s0 = 0, sm = 0;
+        for (let i = 0; i < 19; i++) { if (CZ[i] === 0) s0 += fi[i]; else if (CZ[i] < 0) sm += fi[i]; }
+        rho = (s0 + 2 * sm) / (1 - u0); ux = 0; uy = 0; uz = u0;
+      } else rho = 1;
+      const usq = 1.5 * (ux * ux + uy * uy + uz * uz);
+      for (let i = 0; i < 19; i++) {
+        const cu = 3 * (CX[i] * ux + CY[i] * uy + CZ[i] * uz);
+        f2[i * NF + a] = WT[i] * rho * (1 + cu + 0.5 * cu * cu - usq);
+      }
+    } else {
+      let usq = 1.5 * (ux * ux + uy * uy + uz * uz);
+      let pxx = 0, pyy = 0, pzz = 0, pxy = 0, pxz = 0, pyz = 0;
+      for (let i = 0; i < 19; i++) {
+        const cu = 3 * (CXf[i] * ux + CYf[i] * uy + CZf[i] * uz);
+        const e = WT[i] * rho * (1 + cu + 0.5 * cu * cu - usq);
+        fe[i] = e;
+        const ne = fi[i] - e;
+        pxx += XX[i] * ne; pyy += YY[i] * ne; pzz += ZZ[i] * ne;
+        pxy += XY[i] * ne; pxz += XZ[i] * ne; pyz += YZ[i] * ne;
+      }
+      const Qn = Math.sqrt(pxx * pxx + pyy * pyy + pzz * pzz + 2 * (pxy * pxy + pxz * pxz + pyz * pyz));
+      const tau = 0.5 * (tau0 + Math.sqrt(tau0 * tau0 + cs2s * Qn / rho));
+      if (fl === 3) {
+        const sl = 1 - Math.min(tau * sig * aniso, 0.9), sv = 1 - Math.min(tau * sig, 0.9);
+        const ex = ux * sl, ey = uy * sv, ez = uz * sl; usq = 1.5 * (ex * ex + ey * ey + ez * ez);
+        for (let i = 0; i < 19; i++) {
+          const cu = 3 * (CXf[i] * ex + CYf[i] * ey + CZf[i] * ez);
+          fe[i] = WT[i] * rho * (1 + cu + 0.5 * cu * cu - usq);
+        }
+        ux = 0.5 * (ux + ex); uy = 0.5 * (uy + ey); uz = 0.5 * (uz + ez);  // physikalische Geschwindigkeit
+      }
+      const it = 1 / tau;
+      for (let i = 0; i < 19; i++) f2[i * NF + a] = fi[i] - (fi[i] - fe[i]) * it;
+    }
+    if (acc) { acc[a] += ux; acc[NF + a] += uy; acc[2 * NF + a] += uz; acc[3 * NF + a] += rho; }
+  }
+}
+
+// vertikale Geschwindigkeit (Richtung Filter) fuer eine Liste von Zellen aus f
+function probeCPU(S, f, list) {
+  const NF = S.NF, out = new Float32Array(list.length);
+  list.forEach((a, n) => { let r = 0, my = 0; for (let i = 0; i < 19; i++) { const v = f[i * NF + a]; r += v; my += CY[i] * v; } out[n] = my / r; });
+  return out;
+}
+
+function progressInfo(S, vy, step, steps, t0, hist) {
+  const nM = S.layerM.length; let sw = 0;
+  for (let n = 0; n < nM; n++) sw += -vy[n];
+  const wm = sw / nM; let dev = 0; for (let n = 0; n < nM; n++) dev += Math.abs(-vy[n] - wm);
+  let qo = 0; for (let n = nM; n < vy.length; n++) qo += -vy[n];
+  if (!Number.isFinite(qo)) throw new Error(`Rechnung instabil bei Schritt ${step}. Zellgröße vergrößern oder Viskosität (tau) erhöhen.`);
+  const gam = 1 - dev / (2 * nM * wm), mr = qo / (S.Ain * S.u0), el = (Date.now() - t0) / 1000;
+  hist.push([step, gam, mr]);
+  return { step, steps, gamma: gam, massRatio: mr, elapsed: el, eta: el / step * (steps - step), mlups: S.NF * step / el / 1e6 };
+}
+
+function simulate(g, p, onProgress) {
+  const S = setupSim(g, p), NF = S.NF;
+  let f = S.f0.slice(), f2 = new Float32Array(19 * NF);
+  const acc = new Float32Array(4 * NF); let nacc = 0;
+  const probeList = S.layerM.concat(S.layerT), t0 = Date.now(), hist = [];
+  for (let step = 1; step <= p.steps; step++) {
+    const doAcc = step > p.steps - p.avg;
+    cpuStep(S, f, f2, doAcc ? acc : null);
+    const tmp = f; f = f2; f2 = tmp;
+    if (doAcc) nacc++;
+    if (step % p.every === 0 || step === p.steps) {
+      const info = progressInfo(S, probeCPU(S, f, probeList), step, p.steps, t0, hist);
+      info.device = "CPU"; onProgress && onProgress(info);
+    }
+  }
+  for (let x = 0; x < 4 * NF; x++) acc[x] /= Math.max(nacc, 1);
+  return evaluate(g, p, acc, S.cells, S.cid, hist, S.Ain, S.Af);
+}
+
+/* ---------------------------------------------------------------- WebGPU */
+const WGSL = /* wgsl */`
+struct P { nf: u32, doacc: u32, nprobe: u32, pad0: u32, u0: f32, tau0: f32, sig: f32, aniso: f32, cs2s: f32, pad1: f32, pad2: f32, pad3: f32 };
+@group(0) @binding(0) var<uniform> prm: P;
+@group(0) @binding(1) var<storage, read> fin: array<f32>;
+@group(0) @binding(2) var<storage, read_write> fout: array<f32>;
+@group(0) @binding(3) var<storage, read> nb: array<i32>;
+@group(0) @binding(4) var<storage, read> flg: array<u32>;
+@group(0) @binding(5) var<storage, read_write> acc: array<f32>;
+
+var<private> CX: array<f32, 19> = array<f32, 19>(0., 1., -1., 0., 0., 0., 0., 1., -1., 1., -1., 1., -1., 1., -1., 0., 0., 0., 0.);
+var<private> CY: array<f32, 19> = array<f32, 19>(0., 0., 0., 1., -1., 0., 0., 1., -1., -1., 1., 0., 0., 0., 0., 1., -1., 1., -1.);
+var<private> CZ: array<f32, 19> = array<f32, 19>(0., 0., 0., 0., 0., 1., -1., 0., 0., 0., 0., 1., -1., -1., 1., 1., -1., -1., 1.);
+var<private> WT: array<f32, 19> = array<f32, 19>(0.33333334, 0.055555556, 0.055555556, 0.055555556, 0.055555556, 0.055555556, 0.055555556,
+  0.027777778, 0.027777778, 0.027777778, 0.027777778, 0.027777778, 0.027777778, 0.027777778, 0.027777778, 0.027777778, 0.027777778, 0.027777778, 0.027777778);
+var<private> OPP: array<u32, 19> = array<u32, 19>(0u, 2u, 1u, 4u, 3u, 6u, 5u, 8u, 7u, 10u, 9u, 12u, 11u, 14u, 13u, 16u, 15u, 18u, 17u);
+
+@compute @workgroup_size(128)
+fn lbm_step(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgroups) ng: vec3<u32>) {
+  let a = gid.x + gid.y * ng.x * 128u;
+  let NF = prm.nf;
+  if (a >= NF) { return; }
+  var fi: array<f32, 19>;
+  var fe: array<f32, 19>;
+  var rho = 0.0; var mx = 0.0; var my = 0.0; var mz = 0.0;
+  for (var i = 0u; i < 19u; i = i + 1u) {
+    let s = nb[a * 19u + i];
+    var v: f32;
+    if (s >= 0) { v = fin[i * NF + u32(s)]; } else { v = fin[OPP[i] * NF + a]; }
+    fi[i] = v; rho = rho + v; mx = mx + CX[i] * v; my = my + CY[i] * v; mz = mz + CZ[i] * v;
+  }
+  var ux = mx / rho; var uy = my / rho; var uz = mz / rho;
+  let fl = flg[a];
+  if (fl == 1u || fl == 2u) {
+    if (fl == 1u) {
+      var s0 = 0.0; var sm = 0.0;
+      for (var i = 0u; i < 19u; i = i + 1u) {
+        if (CZ[i] == 0.0) { s0 = s0 + fi[i]; } else if (CZ[i] < 0.0) { sm = sm + fi[i]; }
+      }
+      rho = (s0 + 2.0 * sm) / (1.0 - prm.u0); ux = 0.0; uy = 0.0; uz = prm.u0;
+    } else { rho = 1.0; }
+    let usq = 1.5 * (ux * ux + uy * uy + uz * uz);
+    for (var i = 0u; i < 19u; i = i + 1u) {
+      let cu = 3.0 * (CX[i] * ux + CY[i] * uy + CZ[i] * uz);
+      fout[i * NF + a] = WT[i] * rho * (1.0 + cu + 0.5 * cu * cu - usq);
+    }
+  } else {
+    var usq = 1.5 * (ux * ux + uy * uy + uz * uz);
+    var pxx = 0.0; var pyy = 0.0; var pzz = 0.0; var pxy = 0.0; var pxz = 0.0; var pyz = 0.0;
+    for (var i = 0u; i < 19u; i = i + 1u) {
+      let cu = 3.0 * (CX[i] * ux + CY[i] * uy + CZ[i] * uz);
+      let e = WT[i] * rho * (1.0 + cu + 0.5 * cu * cu - usq);
+      fe[i] = e;
+      let ne = fi[i] - e;
+      pxx = pxx + CX[i] * CX[i] * ne; pyy = pyy + CY[i] * CY[i] * ne; pzz = pzz + CZ[i] * CZ[i] * ne;
+      pxy = pxy + CX[i] * CY[i] * ne; pxz = pxz + CX[i] * CZ[i] * ne; pyz = pyz + CY[i] * CZ[i] * ne;
+    }
+    let qn = sqrt(pxx * pxx + pyy * pyy + pzz * pzz + 2.0 * (pxy * pxy + pxz * pxz + pyz * pyz));
+    let tau = 0.5 * (prm.tau0 + sqrt(prm.tau0 * prm.tau0 + prm.cs2s * qn / rho));
+    if (fl == 3u) {
+      let sl = 1.0 - min(tau * prm.sig * prm.aniso, 0.9);
+      let sv = 1.0 - min(tau * prm.sig, 0.9);
+      let ex = ux * sl; let ey = uy * sv; let ez = uz * sl;
+      usq = 1.5 * (ex * ex + ey * ey + ez * ez);
+      for (var i = 0u; i < 19u; i = i + 1u) {
+        let cu = 3.0 * (CX[i] * ex + CY[i] * ey + CZ[i] * ez);
+        fe[i] = WT[i] * rho * (1.0 + cu + 0.5 * cu * cu - usq);
+      }
+      ux = 0.5 * (ux + ex); uy = 0.5 * (uy + ey); uz = 0.5 * (uz + ez);
+    }
+    let it = 1.0 / tau;
+    for (var i = 0u; i < 19u; i = i + 1u) { fout[i * NF + a] = fi[i] - (fi[i] - fe[i]) * it; }
+  }
+  if (prm.doacc == 1u) {
+    acc[a] = acc[a] + ux; acc[NF + a] = acc[NF + a] + uy; acc[2u * NF + a] = acc[2u * NF + a] + uz; acc[3u * NF + a] = acc[3u * NF + a] + rho;
+  }
+}
+
+@group(0) @binding(6) var<storage, read> plist: array<u32>;
+@group(0) @binding(7) var<storage, read_write> pout: array<f32>;
+@compute @workgroup_size(64)
+fn probe(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let n = gid.x;
+  if (n >= prm.nprobe) { return; }
+  let a = plist[n]; let NF = prm.nf;
+  var r = 0.0; var my = 0.0;
+  for (var i = 0u; i < 19u; i = i + 1u) { let v = fin[i * NF + a]; r = r + v; my = my + CY[i] * v; }
+  pout[n] = my / r;
+}
+`;
+
+async function gpuDevice() {
+  const gpu = (typeof navigator !== "undefined") && navigator.gpu;
+  if (!gpu) return null;
+  const adapter = await gpu.requestAdapter({ powerPreference: "high-performance" });
+  if (!adapter) return null;
+  const lim = adapter.limits;
+  const device = await adapter.requestDevice({ requiredLimits: {
+    maxStorageBufferBindingSize: lim.maxStorageBufferBindingSize, maxBufferSize: lim.maxBufferSize } });
+  let name = "";
+  try { const info = adapter.info || (adapter.requestAdapterInfo ? await adapter.requestAdapterInfo() : {}); name = [info.vendor, info.architecture, info.description].filter(Boolean).join(" "); } catch (e) { }
+  return { device, name: name || "Grafikkarte" };
+}
+
+class GpuSim {
+  constructor(dev, S) {
+    const d = this.d = dev.device; this.S = S; const NF = S.NF;
+    const mk = (size, usage, data) => {
+      const b = d.createBuffer({ size: Math.max(16, Math.ceil(size / 4) * 4), usage, mappedAtCreation: !!data });
+      if (data) { new data.constructor(b.getMappedRange()).set(data); b.unmap(); }
+      return b;
+    };
+    const ST = GPUBufferUsage.STORAGE, CS = GPUBufferUsage.COPY_SRC, CD = GPUBufferUsage.COPY_DST;
+    this.fA = mk(19 * NF * 4, ST | CS | CD, S.f0); this.fB = mk(19 * NF * 4, ST | CS | CD, S.f0);
+    this.nb = mk(NF * 19 * 4, ST, S.nb); this.flg = mk(NF * 4, ST, S.flag);
+    this.acc = mk(4 * NF * 4, ST | CS | CD);
+    const plist = Uint32Array.from(S.layerM.concat(S.layerT)); this.np = plist.length;
+    this.plist = mk(plist.length * 4, ST, plist); this.pout = mk(plist.length * 4, ST | CS);
+    this.pread = mk(plist.length * 4, GPUBufferUsage.MAP_READ | CD);
+    const prm = (doacc) => {
+      const ab = new ArrayBuffer(48), u = new Uint32Array(ab), fl = new Float32Array(ab);
+      u[0] = NF; u[1] = doacc; u[2] = plist.length; fl[4] = S.u0; fl[5] = S.tau0; fl[6] = S.sig; fl[7] = S.aniso; fl[8] = S.cs2s;
+      const b = d.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | CD }); d.queue.writeBuffer(b, 0, ab); return b;
+    };
+    this.p0 = prm(0); this.p1 = prm(1);
+    const mod = d.createShaderModule({ code: WGSL });
+    this.modPromise = mod.getCompilationInfo ? mod.getCompilationInfo() : Promise.resolve({ messages: [] });
+    const E = (b, type) => ({ binding: b, visibility: GPUShaderStage.COMPUTE, buffer: { type } });
+    const layoutS = d.createBindGroupLayout({ entries: [E(0, "uniform"), E(1, "read-only-storage"), E(2, "storage"),
+      E(3, "read-only-storage"), E(4, "read-only-storage"), E(5, "storage")] });
+    const layoutP = d.createBindGroupLayout({ entries: [E(0, "uniform"), E(1, "read-only-storage"), E(6, "read-only-storage"), E(7, "storage")] });
+    this.pipeS = d.createComputePipeline({ layout: d.createPipelineLayout({ bindGroupLayouts: [layoutS] }), compute: { module: mod, entryPoint: "lbm_step" } });
+    this.pipeP = d.createComputePipeline({ layout: d.createPipelineLayout({ bindGroupLayouts: [layoutP] }), compute: { module: mod, entryPoint: "probe" } });
+    const bg = (pb, fin, fout) => d.createBindGroup({ layout: layoutS, entries: [
+      { binding: 0, resource: { buffer: pb } }, { binding: 1, resource: { buffer: fin } }, { binding: 2, resource: { buffer: fout } },
+      { binding: 3, resource: { buffer: this.nb } }, { binding: 4, resource: { buffer: this.flg } }, { binding: 5, resource: { buffer: this.acc } }] });
+    this.bg = { 0: [bg(this.p0, this.fA, this.fB), bg(this.p0, this.fB, this.fA)], 1: [bg(this.p1, this.fA, this.fB), bg(this.p1, this.fB, this.fA)] };
+    const bgp = (fin) => d.createBindGroup({ layout: layoutP, entries: [
+      { binding: 0, resource: { buffer: this.p0 } }, { binding: 1, resource: { buffer: fin } },
+      { binding: 6, resource: { buffer: this.plist } }, { binding: 7, resource: { buffer: this.pout } }] });
+    this.bgp = [bgp(this.fA), bgp(this.fB)];
+    const groups = Math.ceil(NF / 128); this.gx = Math.min(groups, 65535); this.gy = Math.ceil(groups / this.gx);
+    this.cur = 0;  // 0: aktuelle Daten in fA
+  }
+  async check() {
+    const info = await this.modPromise;
+    const errs = (info.messages || []).filter((m) => m.type === "error");
+    if (errs.length) throw new Error("Shader-Fehler: " + errs.map((m) => m.message).join("; "));
+  }
+  steps(n, doacc) {
+    const enc = this.d.createCommandEncoder(), pass = enc.beginComputePass();
+    pass.setPipeline(this.pipeS);
+    for (let s = 0; s < n; s++) { pass.setBindGroup(0, this.bg[doacc][this.cur]); pass.dispatchWorkgroups(this.gx, this.gy); this.cur ^= 1; }
+    pass.end(); this.d.queue.submit([enc.finish()]);
+  }
+  async probe() {
+    const enc = this.d.createCommandEncoder(), pass = enc.beginComputePass();
+    pass.setPipeline(this.pipeP); pass.setBindGroup(0, this.bgp[this.cur]); pass.dispatchWorkgroups(Math.ceil(this.np / 64)); pass.end();
+    enc.copyBufferToBuffer(this.pout, 0, this.pread, 0, this.np * 4); this.d.queue.submit([enc.finish()]);
+    await this.pread.mapAsync(GPUMapMode.READ); const out = new Float32Array(this.pread.getMappedRange()).slice(); this.pread.unmap();
+    return out;
+  }
+  async read(buf, n) {
+    const rb = this.d.createBuffer({ size: n * 4, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+    const enc = this.d.createCommandEncoder(); enc.copyBufferToBuffer(buf, 0, rb, 0, n * 4); this.d.queue.submit([enc.finish()]);
+    await rb.mapAsync(GPUMapMode.READ); const out = new Float32Array(rb.getMappedRange()).slice(); rb.unmap(); rb.destroy();
+    return out;
+  }
+  destroy() { for (const b of [this.fA, this.fB, this.nb, this.flg, this.acc, this.plist, this.pout, this.pread, this.p0, this.p1]) b.destroy(); }
+}
+
+// GPU gegen CPU pruefen: 12 Schritte vom gleichen Startzustand, Abweichung der Verteilungen
+async function gpuSelfTest(dev, g, p) {
+  const S = setupSim(g, p), NF = S.NF, n = 12;
+  const sim = new GpuSim(dev, S); await sim.check();
+  sim.steps(n, 0);
+  const fg = await sim.read(sim.cur === 0 ? sim.fA : sim.fB, 19 * NF); sim.destroy();
+  let f = S.f0.slice(), f2 = new Float32Array(19 * NF);
+  for (let s = 0; s < n; s++) { cpuStep(S, f, f2, null); const t = f; f = f2; f2 = t; }
+  let md = 0; for (let x = 0; x < f.length; x += 7) md = Math.max(md, Math.abs(f[x] - fg[x]));
+  return md;
+}
+
+async function simulateGPU(dev, g, p, onProgress) {
+  const S = setupSim(g, p), NF = S.NF, sim = new GpuSim(dev, S); await sim.check();
+  const t0 = Date.now(), hist = []; let step = 0, nacc = 0;
+  const startAcc = p.steps - p.avg;
+  while (step < p.steps) {
+    let n = Math.min(p.every, p.steps - step);
+    if (step < startAcc && step + n > startAcc) n = startAcc - step;
+    const doacc = step >= startAcc ? 1 : 0;
+    sim.steps(n, doacc); step += n; if (doacc) nacc += n;
+    if (step % p.every === 0 || step === p.steps) {
+      const info = progressInfo(S, await sim.probe(), step, p.steps, t0, hist);
+      info.device = "GPU"; onProgress && onProgress(info);
+    }
+  }
+  const acc = await sim.read(sim.acc, 4 * NF); sim.destroy();
+  for (let x = 0; x < 4 * NF; x++) acc[x] /= Math.max(nacc, 1);
+  return evaluate(g, p, acc, S.cells, S.cid, hist, S.Ain, S.Af);
+}
+
+function evaluate(g, p, acc, cells, cid, hist, Ain, Af) {
+  const { nx, ny, nz, xc, dc, zc, fluid, opening, top, h } = g, NF = g.nf, u0 = p.u;
+  const U = (c, comp) => { const a = cid[c]; return a < 0 ? NaN : acc[comp * NF + a]; };
+  const idx = (i, j, k) => (i * ny + j) * nz + k;
+  // Filterkarte (Mitte Faltenpaket)
+  const jm = g.jm, fmap = new Float32Array(nx * nz).fill(NaN);
+  let sw = 0, n = 0;
+  for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) { const c = idx(i, jm, k); if (fluid[c]) { const w = -U(c, 1); fmap[i * nz + k] = w; sw += w; n++; } }
+  const wm = sw / n; let dev = 0, cdev = 0, cn = 0, csum = 0, low = 0, high = 0, rev = 0, mxr = 0;
+  const core = new Uint8Array(nx * nz);
+  for (let i = 1; i < nx - 1; i++) for (let k = 1; k < nz - 1; k++) {
+    const ok = (ii, kk) => fluid[idx(ii, jm, kk)];
+    if (ok(i, k) && ok(i - 1, k) && ok(i + 1, k) && ok(i, k - 1) && ok(i, k + 1)) core[i * nz + k] = 1;
+  }
+  for (let x = 0; x < nx * nz; x++) if (core[x]) { csum += fmap[x]; cn++; }
+  const cm = csum / cn;
+  for (let x = 0; x < nx * nz; x++) {
+    const w = fmap[x]; if (Number.isNaN(w)) continue;
+    dev += Math.abs(w - wm); if (w < 0) rev++; mxr = Math.max(mxr, w / wm);
+    if (core[x]) { cdev += Math.abs(w - cm); if (w < 0.5 * cm) low++; if (w > 1.5 * cm) high++; }
+    fmap[x] = w / wm;
+  }
+  // Druckverlust Rohluftseite
+  let pin = 0, pinN = 0, pb = 0, pbN = 0;
+  const jb = firstGE(dc, g.pleat + 2 * h);
+  for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) if (opening[i * ny + j]) { const c = idx(i, j, 1); if (fluid[c]) { pin += U(c, 3); pinN++; } }
+  for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) { const c = idx(i, jb, k); if (fluid[c]) { pb += U(c, 3); pbN++; } }
+  const zeta = ((pin / pinN - pb / pbN) / 3) / (0.5 * u0 * u0);
+  // Schnitte
+  let si = 0, sj = 0, so = 0;
+  for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) if (opening[i * ny + j]) { si += i; sj += j; so++; }
+  const ic = Math.round(si / so), jc = Math.round(sj / so);
+  const jlow = firstGE(dc, g.pleat + 12);
+  const plan = (j) => {
+    const s = new Float32Array(nx * nz).fill(NaN), a = new Float32Array(nx * nz), b = new Float32Array(nx * nz);
+    for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) {
+      const c = idx(i, j, k); if (!fluid[c]) continue;
+      const ux = U(c, 0) / u0, uy = U(c, 1) / u0, uz = U(c, 2) / u0;
+      s[i * nz + k] = Math.hypot(ux, uy, uz); a[i * nz + k] = ux; b[i * nz + k] = uz;
+    }
+    return { speed: s, ua: a, ub: b, n1: nx, n2: nz, depth: dc[j] };
+  };
+  const lon = { speed: new Float32Array(nz * ny).fill(NaN), ua: new Float32Array(nz * ny), ub: new Float32Array(nz * ny), n1: nz, n2: ny, x: xc[ic] };
+  for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) {
+    const c = idx(ic, j, k); if (!fluid[c]) continue;
+    const ux = U(c, 0) / u0, uy = U(c, 1) / u0, uz = U(c, 2) / u0;
+    lon.speed[k * ny + j] = Math.hypot(ux, uy, uz); lon.ua[k * ny + j] = uz; lon.ub[k * ny + j] = uy;
+  }
+  return {
+    metrics: {
+      gamma: 1 - dev / (2 * n * wm), gammaCore: 1 - cdev / (2 * cn * cm), lowCore: low / cn, highCore: high / cn,
+      reverse: rev / n, maxToMean: mxr, zeta, inlet_cm2: Ain * h * h / 100, filter_cm2: Af * h * h / 100,
+    },
+    hist, fmap, nx, nz, ny, xc: Array.from(xc), zc: Array.from(zc), dc: Array.from(dc), pleat: g.pleat,
+    planInlet: plan(jc), planLow: plan(jlow), lon,
+    frame: { dAx: g.fr.dAx, iAx: g.fr.iAx, oAx: g.fr.oAx, sd: g.fr.sd, si: g.fr.si, seal: g.fr.seal },
+  };
+}
+
+// ---------------------------------------------------------------- Worker-Anbindung
+if (typeof self !== "undefined" && typeof importScripts === "function") {
+  let tris = null, geo = null, dev = null, devTried = false;
+  self.onmessage = async (e) => {
+    const m = e.data;
+    try {
+      if (m.type === "load") {
+        tris = parseSTL(m.buffer); geo = null;
+        const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+        for (let v = 0; v < tris.length; v += 3) for (let a = 0; a < 3; a++) { mn[a] = Math.min(mn[a], tris[v + a]); mx[a] = Math.max(mx[a], tris[v + a]); }
+        const copy = tris.slice();
+        self.postMessage({ type: "loaded", tris: copy, ntri: tris.length / 9, mn, mx }, [copy.buffer]);
+      } else if (m.type === "gpuinfo") {
+        if (!devTried) { devTried = true; try { dev = await gpuDevice(); } catch (err) { dev = null; } }
+        self.postMessage({ type: "gpuinfo", ok: !!dev, name: dev ? dev.name : "" });
+      } else if (m.type === "prepare") {
+        const t = Date.now();
+        geo = prepare(Object.assign({ tris }, m.params));
+        self.postMessage({ type: "prepared", summary: geo.summary, ms: Date.now() - t });
+      } else if (m.type === "run") {
+        if (!geo) throw new Error("Bitte zuerst die Geometrie prüfen.");
+        const p = m.params; let res = null;
+        const prog = (info) => self.postMessage({ type: "progress", info });
+        if (p.device !== "cpu") {
+          if (!devTried) { devTried = true; try { dev = await gpuDevice(); } catch (err) { dev = null; } }
+          if (dev) {
+            try {
+              self.postMessage({ type: "status", text: "Grafikkarte wird geprüft …" });
+              const md = await gpuSelfTest(dev, geo, p);
+              if (!(md < 1e-3)) throw new Error("Abweichung GPU/CPU " + md.toExponential(1));
+              self.postMessage({ type: "status", text: "Rechnet auf der Grafikkarte (" + dev.name + ")" });
+              res = await simulateGPU(dev, geo, p, prog); res.device = "GPU · " + dev.name;
+            } catch (err) {
+              self.postMessage({ type: "status", text: "Grafikkarte nicht nutzbar (" + (err.message || err) + "), rechne auf dem Prozessor" });
+              res = null;
+            }
+          } else self.postMessage({ type: "status", text: "Keine WebGPU-Grafikkarte verfügbar, rechne auf dem Prozessor" });
+        }
+        if (!res) { res = simulate(geo, p, prog); res.device = "CPU"; }
+        self.postMessage({ type: "result", res });
+      }
+    } catch (err) { self.postMessage({ type: "error", message: err.message || String(err) }); }
+  };
+}
+if (typeof module !== "undefined") module.exports = { parseSTL, prepare, simulate, setupSim, cpuStep };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const AX = ["X", "Y", "Z"];
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = (v, d = 1) => Number(v).toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
+
+// ---------------- Worker
+const engineURL = URL.createObjectURL(new Blob([$("engine-src").textContent], { type: "text/javascript" }));
+let worker = null, stlBuf = null, stlName = "", silent = false, runStart = 0, lastParams = null;
+const S = { seal: null, inlet: null, pick: null, summary: null, bbox: null, results: [], cur: -1, running: false };
+function newWorker() { worker = new Worker(engineURL); worker.onmessage = onMsg; worker.postMessage({ type: "gpuinfo" }); }
+newWorker();
+
+function status(text, kind = "info") { const s = $("status"); s.hidden = !text; s.textContent = text || ""; s.className = "msg " + kind; }
+function setStep(id, st) { $(id).dataset.state = st; }
+
+function onMsg(e) {
+  const m = e.data;
+  if (m.type === "gpuinfo") {
+    $("gpuTag").textContent = m.ok ? "Grafikkarte: " + m.name : "Keine WebGPU-Grafikkarte · rechnet auf dem Prozessor";
+  } else if (m.type === "loaded") {
+    if (silent) { silent = false; if (S.seal && S.inlet) prepare(); return; }
+    buildMesh(m.tris, m.mn, m.mx);
+    S.bbox = { mn: m.mn, mx: m.mx }; S.seal = null; S.inlet = null; S.summary = null;
+    const f = $("modelFacts"); f.hidden = false;
+    f.innerHTML = `<dt>Datei</dt><dd>${esc(stlName)}</dd><dt>Dreiecke</dt><dd>${m.ntri.toLocaleString("de-DE")}</dd>` +
+      AX.map((a, i) => `<dt>${a}</dt><dd>${fmt(m.mn[i])} … ${fmt(m.mx[i])}</dd>`).join("");
+    setStep("s1", "done"); setStep("s2", "open"); setStep("s3", "locked"); setStep("s4", "locked");
+    $("sealInfo").textContent = "Noch nicht festgelegt"; $("inletInfo").textContent = "Noch nicht festgelegt";
+    $("run").disabled = true; $("geoFacts").hidden = true; status("");
+    updateMarkers();
+  } else if (m.type === "prepared") {
+    S.summary = m.summary; showGeo(m.summary);
+  } else if (m.type === "status") {
+    status(m.text, m.text.includes("nicht") || m.text.includes("Keine") ? "err" : "info");
+  } else if (m.type === "progress") {
+    const i = m.info;
+    $("barFill").style.width = (100 * i.step / i.steps).toFixed(1) + "%";
+    $("progText").textContent = `Schritt ${i.step} / ${i.steps} · γ ${fmt(i.gamma, 3)} · Massenbilanz ${fmt(i.massRatio, 2)} · ` +
+      `${fmt(i.mlups, 1)} Mio. Zellen/s · noch ${Math.max(0, Math.round(i.eta))} s`;
+  } else if (m.type === "result") {
+    S.running = false; uiRunning(false);
+    const r = m.res; r.name = `${stlName.replace(/\.stl$/i, "")} · ${fmt(lastParams.dx, 1)} mm · K ${fmt(lastParams.K, 1)}`;
+    r.seconds = (Date.now() - runStart) / 1000;
+    S.results.push(r); S.cur = S.results.length - 1;
+    status("Rechnung fertig.", "ok"); renderResults();
+  } else if (m.type === "error") {
+    if (S.running) { S.running = false; uiRunning(false); }
+    status(m.message, "err");
+  }
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// ---------------- Datei laden
+function loadFile(file) {
+  if (!file) return;
+  stlName = file.name;
+  file.arrayBuffer().then((buf) => { stlBuf = buf.slice(0); worker.postMessage({ type: "load", buffer: buf }, [buf]); status("Modell wird geladen …"); });
+}
+$("file").addEventListener("change", (e) => loadFile(e.target.files[0]));
+const drop = $("drop");
+["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", (e) => loadFile(e.dataTransfer.files[0]));
+drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); } });
+drop.tabIndex = 0;
+
+// ---------------- 3D
+const canvas = $("c3d");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 0.5, 20000);
+const controls = new THREE.OrbitControls(camera, canvas); controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x5d666e, 0.8));
+const sun = new THREE.DirectionalLight(0xffffff, 0.65); scene.add(sun);
+const grp = new THREE.Group(); scene.add(grp);
+let mesh = null, axes = null, sealViz = null, inletViz = null, openViz = null, marker = null;
+const meshMat = new THREE.MeshStandardMaterial({ color: 0x8b959e, roughness: .75, metalness: .02, side: THREE.DoubleSide, flatShading: true });
+
+function buildMesh(tris, mn, mx) {
+  if (mesh) { grp.remove(mesh); mesh.geometry.dispose(); }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(tris, 3)); g.computeVertexNormals();
+  mesh = new THREE.Mesh(g, meshMat); grp.add(mesh);
+  if (axes) grp.remove(axes);
+  const size = Math.max(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]);
+  axes = new THREE.AxesHelper(size * 0.25); axes.position.set(mn[0], mn[1], mn[2]); grp.add(axes);
+  const c = new THREE.Vector3((mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2, (mn[2] + mx[2]) / 2);
+  controls.target.copy(c);
+  camera.position.set(c.x + size * 1.1, c.y + size * 0.9, c.z + size * 1.3);
+  camera.near = size / 200; camera.far = size * 50; camera.updateProjectionMatrix();
+  sun.position.set(c.x + size, c.y + size * 2, c.z + size * 1.5);
+}
+
+function clearViz(o) { if (o) { grp.remove(o); o.traverse((x) => { if (x.geometry) x.geometry.dispose(); }); } return null; }
+function updateMarkers() {
+  sealViz = clearViz(sealViz); inletViz = clearViz(inletViz); openViz = clearViz(openViz);
+  if (!S.bbox) return;
+  const { mn, mx } = S.bbox;
+  if (S.seal) {
+    const a = S.seal.axis, pleat = +$("pleat").value || 0, dir = -S.seal.sign;
+    const lo = [...mn], hi = [...mx]; lo[a] = Math.min(S.seal.coord, S.seal.coord + dir * pleat); hi[a] = Math.max(S.seal.coord, S.seal.coord + dir * pleat);
+    const box = new THREE.BoxGeometry(hi[0] - lo[0] || 0.5, hi[1] - lo[1] || 0.5, hi[2] - lo[2] || 0.5);
+    sealViz = new THREE.Group();
+    const m = new THREE.Mesh(box, new THREE.MeshBasicMaterial({ color: new THREE.Color(css("--seal")), transparent: true, opacity: .22, depthWrite: false }));
+    m.position.set((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2); sealViz.add(m);
+    const e = new THREE.LineSegments(new THREE.EdgesGeometry(box), new THREE.LineBasicMaterial({ color: new THREE.Color(css("--seal")) }));
+    e.position.copy(m.position); sealViz.add(e); grp.add(sealViz);
+  }
+  if (S.summary && S.summary.openPts) {
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(S.summary.openPts), 3));
+    openViz = new THREE.Points(g, new THREE.PointsMaterial({ color: new THREE.Color(css("--pick")), size: +$("dx").value, sizeAttenuation: true }));
+    grp.add(openViz);
+  }
+  if (S.inlet) {
+    const sz = Math.max(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]);
+    inletViz = new THREE.Mesh(new THREE.SphereGeometry(sz * 0.012, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(css("--pick")) }));
+    inletViz.position.set(...S.inlet.point); grp.add(inletViz);
+  }
+}
+
+// Klick-Auswahl
+const ray = new THREE.Raycaster(); let downAt = null;
+canvas.addEventListener("pointerdown", (e) => { downAt = [e.clientX, e.clientY]; });
+canvas.addEventListener("pointerup", (e) => {
+  if (!S.pick || !mesh || !downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
+  const r = canvas.getBoundingClientRect();
+  ray.setFromCamera({ x: ((e.clientX - r.left) / r.width) * 2 - 1, y: -((e.clientY - r.top) / r.height) * 2 + 1 }, camera);
+  const hit = ray.intersectObject(mesh, false)[0]; if (!hit) return;
+  const pos = mesh.geometry.attributes.position, fi = hit.faceIndex * 3;
+  const A = new THREE.Vector3().fromBufferAttribute(pos, fi), B = new THREE.Vector3().fromBufferAttribute(pos, fi + 1), C = new THREE.Vector3().fromBufferAttribute(pos, fi + 2);
+  const n = new THREE.Vector3().subVectors(B, A).cross(new THREE.Vector3().subVectors(C, A)).normalize();
+  if (n.dot(ray.ray.direction) > 0) n.negate();
+  const comp = [n.x, n.y, n.z], axis = comp.map(Math.abs).indexOf(Math.max(...comp.map(Math.abs))), sign = Math.sign(comp[axis]);
+  const p = [hit.point.x, hit.point.y, hit.point.z];
+  if (Math.abs(comp[axis]) < 0.9) { status("Die angeklickte Fläche ist schräg. Bitte eine achsparallele Fläche wählen.", "err"); return; }
+  if (S.pick === "seal") {
+    S.seal = { axis, sign, coord: Math.round(p[axis] * 10) / 10 };
+    $("sealCoord").value = S.seal.coord; sealText(); setStep("s2", "done"); setStep("s3", S.inlet ? "done" : "open");
+  } else {
+    if (S.seal && axis === S.seal.axis) { status("Der Einlass muss auf einer anderen Seite liegen als die Filterebene.", "err"); return; }
+    S.inlet = { axis, sign, point: p };
+    $("inletInfo").textContent = `Seite ${sign > 0 ? "+" : "−"}${AX[axis]} · Klick bei ${p.map((v) => fmt(v, 0)).join(" / ")}`;
+    setStep("s3", "done");
+  }
+  setPick(null); status(""); updateMarkers();
+  if (S.seal && S.inlet) prepare();
+});
+function setPick(mode) {
+  S.pick = mode;
+  $("pickSeal").setAttribute("aria-pressed", mode === "seal"); $("pickInlet").setAttribute("aria-pressed", mode === "inlet");
+  const v = $("vmode"); v.classList.toggle("pickmode", !!mode);
+  v.textContent = mode === "seal" ? "Klicke auf die Dichtfläche des Filters" : mode === "inlet" ? "Klicke auf die Außenwand am Einlass" : "Ziehen = drehen · Scrollen = zoomen · Rechtsklick = verschieben";
+  canvas.style.cursor = mode ? "crosshair" : "";
+}
+$("pickSeal").addEventListener("click", () => { if (mesh) setPick(S.pick === "seal" ? null : "seal"); });
+$("pickInlet").addEventListener("click", () => { if (mesh && S.seal) setPick(S.pick === "inlet" ? null : "inlet"); });
+function sealText() {
+  if (!S.seal) return;
+  $("sealInfo").textContent = `Ebene ${AX[S.seal.axis]} = ${fmt(S.seal.coord)} mm · Kasten liegt in ${S.seal.sign > 0 ? "−" : "+"}${AX[S.seal.axis]}`;
+}
+$("sealCoord").addEventListener("change", () => { if (!S.seal) return; S.seal.coord = +$("sealCoord").value; sealText(); updateMarkers(); if (S.inlet) prepare(); });
+$("pleat").addEventListener("change", () => { updateMarkers(); if (S.seal && S.inlet) prepare(); });
+$("dx").addEventListener("change", () => { $("steps").value = Math.round(5000 * 3 / +$("dx").value / 500) * 500; if (S.seal && S.inlet) prepare(); });
+$("filterType").addEventListener("change", () => { $("K").value = $("filterType").value; });
+
+function prepare() {
+  if (S.running) return;
+  S.summary = null; $("run").disabled = true; status("Geometrie wird geprüft …");
+  worker.postMessage({ type: "prepare", params: { dx: +$("dx").value, sealAxis: S.seal.axis, sealSign: S.seal.sign, seal: S.seal.coord,
+    inletAxis: S.inlet.axis, inletSign: S.inlet.sign, click: S.inlet.point, pleat: +$("pleat").value } });
+}
+function showGeo(s) {
+  const f = $("geoFacts"); f.hidden = false;
+  f.innerHTML = `<dt>Einlassfläche</dt><dd>${fmt(s.inlet_cm2, 0)} cm²</dd><dt>Filterfläche</dt><dd>${fmt(s.filter_cm2, 0)} cm²</dd>` +
+    `<dt>Luftraum</dt><dd>${fmt(s.volume_l, 2)} l</dd><dt>Rechenzellen</dt><dd>${s.cells.toLocaleString("de-DE")}</dd>` +
+    `<dt>Öffnungen auf der Seite</dt><dd>${s.nHoles}</dd>`;
+  const warn = [];
+  if (!s.pleatOk) warn.push("Faltentiefe ist kleiner als eine Zelle.");
+  if (s.filter_cm2 < 20) warn.push("Filterfläche sehr klein – Dichtebene prüfen.");
+  if (s.outlet_cm2 > s.filter_cm2 * 1.6) warn.push("Auslassfläche deutlich größer als die Filterfläche – ist der Kasten dicht?");
+  status(warn.length ? warn.join(" ") : "Geometrie in Ordnung. Die grünen Punkte zeigen die erkannte Einlassöffnung.", warn.length ? "err" : "ok");
+  setStep("s4", "open"); $("run").disabled = false; updateMarkers();
+}
+
+// ---------------- Rechnen
+function uiRunning(on) {
+  $("run").hidden = on; $("cancel").hidden = !on; $("prog").hidden = !on;
+  ["pickSeal", "pickInlet", "dx", "pleat", "sealCoord", "filterType", "device"].forEach((id) => { $(id).disabled = on; });
+}
+$("run").addEventListener("click", () => {
+  if (!S.summary) return;
+  const steps = Math.max(500, +$("steps").value);
+  lastParams = { device: $("device").value, K: +$("K").value, aniso: +$("aniso").value, u: +$("u").value, tau: Math.max(0.502, +$("tau").value),
+    steps, avg: Math.round(steps / 3), every: Math.max(100, Math.round(steps / 40 / 50) * 50), dx: +$("dx").value };
+  S.running = true; runStart = Date.now(); uiRunning(true); $("barFill").style.width = "0%"; $("progText").textContent = "Startet …";
+  worker.postMessage({ type: "run", params: lastParams });
+});
+$("cancel").addEventListener("click", () => {
+  worker.terminate(); S.running = false; uiRunning(false); status("Rechnung abgebrochen.", "info");
+  newWorker(); silent = true; const b = stlBuf.slice(0); worker.postMessage({ type: "load", buffer: b }, [b]);
+});
+
+// ---------------- Ergebnisse
+const DIV = [[0, [43, 93, 158]], [0.5, [244, 244, 242]], [1, [178, 48, 43]]];
+const SEQ = [[0, [11, 10, 31]], [0.2, [59, 28, 90]], [0.4, [140, 41, 129]], [0.6, [222, 73, 104]], [0.8, [254, 159, 109]], [1, [252, 253, 191]]];
+function cmap(stops, t) {
+  t = Math.min(1, Math.max(0, t));
+  for (let i = 1; i < stops.length; i++) if (t <= stops[i][0]) {
+    const [a, ca] = stops[i - 1], [b, cb] = stops[i], f = (t - a) / (b - a);
+    return ca.map((v, k) => Math.round(v + (cb[k] - v) * f));
+  }
+  return stops[stops.length - 1][1];
+}
+/* o: n1, n2, val(i1,i2), vec(i1,i2)->[a,b] (a nach rechts, b nach oben), t(v)->0..1, stops, ticks1/ticks2: [{at:index, label}], xlabel, ylabel, flipY, cbar:{labels:[[t,text]]} */
+function drawMap(cv, o) {
+  const W = cv.clientWidth || 600, ml = 46, mb = 36, mt = 8, mr = 64;
+  const cell = Math.max(1.5, Math.min((W - ml - mr) / o.n1, 520 / o.n2));
+  const pw = cell * o.n1, ph = cell * o.n2, H = Math.ceil(ph + mt + mb);
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.height = H + "px";
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  const img = new ImageData(o.n1, o.n2);
+  for (let a = 0; a < o.n1; a++) for (let b = 0; b < o.n2; b++) {
+    const v = o.val(a, b), row = o.flipY ? b : o.n2 - 1 - b, p = (row * o.n1 + a) * 4;
+    if (Number.isNaN(v)) { img.data[p + 3] = 0; continue; }
+    const c = cmap(o.stops, o.t(v)); img.data[p] = c[0]; img.data[p + 1] = c[1]; img.data[p + 2] = c[2]; img.data[p + 3] = 255;
+  }
+  const tmp = document.createElement("canvas"); tmp.width = o.n1; tmp.height = o.n2; tmp.getContext("2d").putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = false; ctx.drawImage(tmp, ml, mt, pw, ph);
+  // Pfeile
+  if (o.vec) {
+    const st = Math.max(1, Math.round(15 / cell)); ctx.strokeStyle = o.arrowColor || "rgba(255,255,255,.75)"; ctx.lineWidth = 1;
+    for (let a = Math.floor(st / 2); a < o.n1; a += st) for (let b = Math.floor(st / 2); b < o.n2; b += st) {
+      const v = o.vec(a, b); if (!v || Number.isNaN(v[0])) continue;
+      const len = Math.hypot(v[0], v[1]); if (len < 0.02) continue;
+      const L = Math.min(1, len) * st * cell * 0.85, dxv = v[0] / len * L, dyv = (o.flipY ? 1 : -1) * v[1] / len * L;
+      const x0 = ml + (a + 0.5) * cell - dxv / 2, y0 = mt + ((o.flipY ? b : o.n2 - 1 - b) + 0.5) * cell - dyv / 2;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + dxv, y0 + dyv);
+      const ang = Math.atan2(dyv, dxv), hl = Math.min(4, L * 0.4);
+      ctx.lineTo(x0 + dxv - hl * Math.cos(ang - 0.5), y0 + dyv - hl * Math.sin(ang - 0.5));
+      ctx.moveTo(x0 + dxv, y0 + dyv); ctx.lineTo(x0 + dxv - hl * Math.cos(ang + 0.5), y0 + dyv - hl * Math.sin(ang + 0.5)); ctx.stroke();
+    }
+  }
+  // Achsen
+  const fg = css("--muted"); ctx.fillStyle = fg; ctx.strokeStyle = css("--line"); ctx.font = `11px ${css("--f-mono")}`;
+  ctx.strokeRect(ml, mt, pw, ph);
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  for (const t of o.ticks1) { const x = ml + (t.at + 0.5) * cell; ctx.fillText(t.label, x, mt + ph + 4); ctx.beginPath(); ctx.moveTo(x, mt + ph); ctx.lineTo(x, mt + ph + 3); ctx.stroke(); }
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (const t of o.ticks2) { const y = mt + ((o.flipY ? t.at : o.n2 - 1 - t.at) + 0.5) * cell; ctx.fillText(t.label, ml - 5, y); ctx.beginPath(); ctx.moveTo(ml - 3, y); ctx.lineTo(ml, y); ctx.stroke(); }
+  ctx.font = `12px ${css("--f-body")}`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+  ctx.fillText(o.xlabel, ml + pw / 2, H - 2);
+  ctx.save(); ctx.translate(11, mt + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "middle"; ctx.fillText(o.ylabel, 0, 0); ctx.restore();
+  // Farbskala
+  const bx = ml + pw + 14, bh = Math.min(ph, 220), by = mt + (ph - bh) / 2;
+  for (let y = 0; y < bh; y++) { const c = cmap(o.stops, 1 - y / bh); ctx.fillStyle = `rgb(${c})`; ctx.fillRect(bx, by + y, 10, 1.2); }
+  ctx.fillStyle = fg; ctx.font = `10.5px ${css("--f-mono")}`; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  for (const [t, lab] of o.cbar) ctx.fillText(lab, bx + 14, by + (1 - t) * bh);
+}
+function ticks(coords, map, n = 5) {
+  const lo = Math.min(map(coords[0]), map(coords[coords.length - 1])), hi = Math.max(map(coords[0]), map(coords[coords.length - 1]));
+  const raw = (hi - lo) / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 5, 10].map((m) => m * mag).find((s) => s >= raw);
+  const out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+    let best = 0, bd = Infinity; coords.forEach((c, i) => { const d = Math.abs(map(c) - v); if (d < bd) { bd = d; best = i; } });
+    out.push({ at: best, label: String(Math.round(v)) });
+  }
+  return out;
+}
+const tDiv = (v) => (v <= 1 ? v * 0.5 : 0.5 + (v - 1) / 1.5 * 0.5);
+
+function renderResults() {
+  const r = S.results[S.cur]; if (!r) return;
+  $("results").hidden = false;
+  const M = r.metrics, fr = r.frame;
+  const verdict = M.gammaCore >= 0.95 ? ["sehr gleichmäßig", "good"] : M.gammaCore >= 0.9 ? ["gut", "good"] : M.gammaCore >= 0.8 ? ["mäßig", "warn"] : ["ungleichmäßig", "bad"];
+  $("resMeta").textContent = `${r.name} · ${r.device} · ${fmt(r.seconds, 0)} s`;
+  $("kpis").innerHTML =
+    `<div class="kpi"><span>Gleichförmigkeit γ (Kern)</span><b>${fmt(M.gammaCore, 3)}</b><span class="chip ${verdict[1]}">${verdict[0]}</span></div>` +
+    `<div class="kpi"><span>Filterfläche unter 50 %</span><b>${fmt(M.lowCore * 100, 1)} %</b><span>Strahlzonen über 150 %: ${fmt(M.highCore * 100, 1)} %</span></div>` +
+    `<div class="kpi"><span>Höchste Anströmung</span><b>${fmt(M.maxToMean, 2)} ×</b><span>des Mittelwerts</span></div>` +
+    `<div class="kpi"><span>Verlustbeiwert Rohluftseite ζ</span><b>${fmt(M.zeta, 2)}</b><span>× Staudruck im Einlass</span></div>`;
+  const xl = `${AX[fr.oAx]} [mm]`, zl = `${AX[fr.iAx]} [mm]`;
+  const mapZ = (z) => -fr.si * z;
+  const t1 = ticks(r.xc, (x) => x), t2 = ticks(r.zc, mapZ);
+  drawMap($("m1"), { n1: r.nx, n2: r.nz, val: (i, k) => r.fmap[i * r.nz + k], t: tDiv, stops: DIV, ticks1: t1, ticks2: t2, xlabel: xl, ylabel: zl,
+    cbar: [[0, "0"], [0.5, "1,0"], [tDiv(1.5), "1,5"], [1, "2,5"]] });
+  const sp = (pl, vmax, id, sub, txt) => {
+    $(sub).textContent = txt;
+    drawMap($(id), { n1: pl.n1, n2: pl.n2, val: (i, k) => pl.speed[i * pl.n2 + k], vec: (i, k) => [pl.ua[i * pl.n2 + k], pl.ub[i * pl.n2 + k]],
+      t: (v) => v / vmax, stops: SEQ, ticks1: t1, ticks2: t2, xlabel: xl, ylabel: zl, cbar: [[0, "0"], [0.5, fmt(vmax / 2, 1)], [1, fmt(vmax, 1)]] });
+  };
+  sp(r.planInlet, 1.2, "m2", "m2s", `Tiefe ${fmt(r.planInlet.depth, 0)} mm unter der Dichtebene · Betrag relativ zur Einlassgeschwindigkeit`);
+  sp(r.planLow, 0.8, "m3", "m3s", `Tiefe ${fmt(r.planLow.depth, 0)} mm (12 mm unter den Falten) · zeigt, welche Bereiche den Filter speisen`);
+  const L = r.lon; $("m4s").textContent = `${AX[fr.oAx]} = ${fmt(L.x, 0)} mm · Einlass links, Faltenzone oben`;
+  drawMap($("m4"), { n1: L.n1, n2: L.n2, flipY: true, val: (k, j) => L.speed[k * L.n2 + j], vec: (k, j) => [L.ua[k * L.n2 + j], -L.ub[k * L.n2 + j]],
+    t: (v) => v / 1.2, stops: SEQ, ticks1: ticks(r.zc, mapZ), ticks2: ticks(r.dc, (d) => d), xlabel: zl, ylabel: "Tiefe ab Dichtebene [mm]",
+    cbar: [[0, "0"], [0.5, "0,6"], [1, "1,2"]] });
+  $("runs").innerHTML = S.results.map((x, n) => `<tr data-n="${n}" class="${n === S.cur ? "sel" : ""}"><td>${esc(x.name)}</td><td>${fmt(x.metrics.gammaCore, 3)}</td>` +
+    `<td>${fmt(x.metrics.lowCore * 100, 1)} %</td><td>${fmt(x.metrics.maxToMean, 2)}</td><td>${fmt(x.metrics.zeta, 2)}</td><td>${fmt(x.metrics.inlet_cm2, 0)} cm²</td>` +
+    `<td>${esc(x.device.split(" · ")[0])}</td><td>${fmt(x.seconds, 0)} s</td></tr>`).join("");
+  calc();
+}
+$("runs").addEventListener("click", (e) => { const tr = e.target.closest("tr"); if (!tr) return; S.cur = +tr.dataset.n; renderResults(); });
+function calc() {
+  const r = S.results[S.cur]; if (!r) return;
+  const ps = +$("ps").value || 0, gs = ps * 0.79, vdot = gs / 1000 / 1.2, A = r.metrics.inlet_cm2 / 1e4, v = vdot / A, q = 0.6 * v * v;
+  $("calcOut").innerHTML = `<dt>Luftmasse</dt><dd>${fmt(gs, 0)} g/s</dd><dt>Geschwindigkeit im Einlass</dt><dd>${fmt(v, 1)} m/s</dd>` +
+    `<dt>Staudruck</dt><dd>${fmt(q / 100, 1)} mbar</dd><dt>Verlust Rohluftseite</dt><dd>${fmt(r.metrics.zeta * q / 100, 1)} mbar</dd>`;
+}
+$("ps").addEventListener("input", calc);
+
+// ---------------- Theme & Schleife
+function applyTheme() { scene.background = new THREE.Color(css("--stage")); updateMarkers(); if (S.cur >= 0) renderResults(); }
+applyTheme();
+try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme); } catch (e) { }
+new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+let rT = 0; addEventListener("resize", () => { clearTimeout(rT); rT = setTimeout(() => { if (S.cur >= 0) renderResults(); }, 200); });
+function loop() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== Math.floor(w * renderer.getPixelRatio()) || canvas.height !== Math.floor(h * renderer.getPixelRatio())) {
+    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  }
+  controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop);
+}
+loop();
+</script>
