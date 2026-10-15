@@ -1,0 +1,800 @@
+<meta charset="utf-8">
+<title>Airbox-Strömungsanalyse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: Werkbank – Schrittfolge links, 3D-Ansicht rechts, darunter Messprotokoll mit Karten und Variantenvergleich */
+:root{
+  --bg:#e7ebee; --surface:#f5f7f8; --sunk:#dde3e7; --stage:#d6dde2; --fg:#182026; --muted:#55616b; --line:#c1cbd2;
+  --accent:#c2620a; --accent-fg:#ffffff; --good:#2f7d4f; --warn:#b07a12; --bad:#b23a2e; --pick:#1f8f6a; --seal:#d4a017;
+  --f-display:"Barlow Semi Condensed","Arial Narrow",sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101417; --surface:#171d21; --sunk:#0d1114; --stage:#0b0f12; --fg:#e1e6ea; --muted:#93a0aa; --line:#2a333a;
+  --accent:#f0a03a; --accent-fg:#101417; --good:#5cbf86; --warn:#e2b04a; --bad:#ef7a6c; --pick:#3fd1a0; --seal:#f2c84b;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101417; --surface:#171d21; --sunk:#0d1114; --stage:#0b0f12; --fg:#e1e6ea; --muted:#93a0aa; --line:#2a333a;
+  --accent:#f0a03a; --accent-fg:#101417; --good:#5cbf86; --warn:#e2b04a; --bad:#ef7a6c; --pick:#3fd1a0; --seal:#f2c84b;
+  color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.wrap{max-width:1360px;margin:0 auto;padding-inline:18px;padding-block:16px 32px;display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 20px;border-bottom:1px solid var(--line);padding-bottom:10px}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(1.5rem,3vw,2.1rem);margin:0;letter-spacing:.01em;text-wrap:balance}
+.tag{font-family:var(--f-mono);font-size:.76rem;color:var(--muted)}
+.grid{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:960px){.grid{grid-template-columns:minmax(0,1fr)}}
+.steps{display:flex;flex-direction:column;gap:10px;min-width:0}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:9px}
+.step[data-state="locked"]{opacity:.5}
+.step[data-state="done"] .num{background:var(--good);color:var(--accent-fg);border-color:var(--good)}
+.step h2{display:flex;align-items:center;gap:9px;margin:0;font-family:var(--f-display);font-weight:600;font-size:1.08rem;letter-spacing:.02em}
+.num{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;border:1.5px solid var(--muted);font-family:var(--f-mono);font-size:.8rem;flex:none}
+.step p{margin:0;font-size:.9rem;color:var(--muted)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.field{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:8px;align-items:center;font-size:.9rem}
+.field label{color:var(--muted)}
+input[type=number],select{font:inherit;font-size:.9rem;padding:5px 7px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--fg);width:100%;min-width:0}
+input[type=number]{font-family:var(--f-mono);font-size:.84rem}
+button{font-family:var(--f-display);font-weight:600;font-size:.95rem;letter-spacing:.03em;padding:6px 12px;border-radius:4px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+button[aria-pressed="true"]{outline:2px solid var(--pick);outline-offset:1px}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.drop{border:1.5px dashed var(--line);border-radius:6px;padding:14px;text-align:center;font-size:.9rem;color:var(--muted);cursor:pointer}
+.drop.over{border-color:var(--accent);color:var(--fg)}
+.facts{display:grid;grid-template-columns:auto auto;gap:3px 12px;font-size:.86rem;margin:0}
+.facts dt{color:var(--muted)} .facts dd{margin:0;text-align:right;font-family:var(--f-mono);font-size:.8rem;font-variant-numeric:tabular-nums}
+.msg{font-size:.86rem;padding:7px 9px;border-radius:4px;background:var(--sunk);border-left:3px solid var(--muted)}
+.msg.err{border-left-color:var(--bad)} .msg.ok{border-left-color:var(--good)} .msg.info{border-left-color:var(--accent)}
+details summary{cursor:pointer;font-size:.88rem;color:var(--muted)}
+details[open]{display:flex;flex-direction:column;gap:7px}
+.viewer{position:relative;background:var(--stage);border:1px solid var(--line);border-radius:6px;height:clamp(380px,64vh,720px);overflow:hidden;min-width:0}
+#c3d{display:block;width:100%;height:100%;touch-action:none}
+.vhint{position:absolute;left:10px;top:10px;right:10px;display:flex;justify-content:space-between;gap:8px;pointer-events:none;font-size:.8rem}
+.vhint span{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:4px 8px;color:var(--muted)}
+.vhint .pickmode{color:var(--fg);border-color:var(--pick)}
+.vtools{position:absolute;left:10px;bottom:10px;right:10px;display:flex;flex-wrap:wrap;gap:6px}
+.vtools button{font-size:.82rem;padding:4px 9px;background:var(--surface)}
+.axes{font-family:var(--f-mono)}
+.prog{display:flex;flex-direction:column;gap:6px}
+.bar{height:8px;border-radius:4px;background:var(--sunk);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.mono{font-family:var(--f-mono);font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.results{display:flex;flex-direction:column;gap:14px}
+.results[hidden]{display:none!important}
+.sec-h{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 14px;border-bottom:1px solid var(--line);padding-bottom:6px}
+.sec-h h2{font-family:var(--f-display);font-weight:700;font-size:1.35rem;margin:0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.kpi b{font-family:var(--f-display);font-size:1.7rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi span{font-size:.82rem;color:var(--muted)}
+.chip{display:inline-block;font-family:var(--f-display);font-weight:600;font-size:.82rem;letter-spacing:.04em;padding:1px 8px;border-radius:10px;border:1px solid currentColor;width:max-content}
+.chip.good{color:var(--good)} .chip.warn{color:var(--warn)} .chip.bad{color:var(--bad)}
+.maps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:820px){.maps{grid-template-columns:minmax(0,1fr)}}
+figure{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:0}
+figcaption{font-family:var(--f-display);font-weight:600;font-size:1rem}
+figcaption small{display:block;font-family:var(--f-body);font-weight:400;font-size:.82rem;color:var(--muted)}
+figure canvas{width:100%;display:block}
+.two{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px}
+@media (max-width:820px){.two{grid-template-columns:minmax(0,1fr)}}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:.86rem}
+th,td{padding:7px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{font-family:var(--f-display);font-weight:600;letter-spacing:.03em;color:var(--muted)}
+td{font-family:var(--f-mono);font-size:.8rem;font-variant-numeric:tabular-nums}
+tr.sel td{background:var(--sunk)}
+tbody tr{cursor:pointer}
+.calc{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.calc h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:1.05rem}
+.note{font-size:.84rem;color:var(--muted);margin:0;max-width:75ch}
+.stage{display:flex;flex-direction:column;gap:10px;min-width:0}
+.viz{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:9px}
+.viz h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:1.02rem;letter-spacing:.02em}
+.vizrow{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:.88rem}
+.vizrow label{display:inline-flex;align-items:center;gap:6px}
+.vizrow select{width:auto;max-width:100%}
+input[type=range]{accent-color:var(--accent);flex:1 1 180px;min-width:0}
+.legend3d{position:absolute;right:10px;top:46px;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:6px 8px;display:flex;flex-direction:column;gap:3px;font-size:.76rem;color:var(--muted);pointer-events:none;max-width:calc(100% - 20px)}
+.legend3d canvas{width:180px;height:10px;display:block;border-radius:2px;max-width:100%}
+.legend3d .lt{display:flex;justify-content:space-between;gap:10px;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.legend3d b{font-weight:600;color:var(--fg)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Airbox-Strömungsanalyse</h1>
+    <span class="tag" id="gpuTag">Rechenwerk wird erkannt …</span>
+  </header>
+
+  <div class="grid">
+    <div class="steps">
+      <section class="step" id="s1" data-state="open">
+        <h2><span class="num">1</span>Modell laden</h2>
+        <label class="drop" id="drop" for="file">STL-Datei hierher ziehen oder <u>auswählen</u><br><small>Unterteil als geschlossener Körper, Einheit mm</small></label>
+        <input type="file" id="file" accept=".stl" hidden>
+        <dl class="facts" id="modelFacts" hidden></dl>
+      </section>
+
+      <section class="step" id="s2" data-state="locked">
+        <h2><span class="num">2</span>Filter-Dichtebene</h2>
+        <p>Klicke auf die Auflagefläche der Filterdichtung (Flansch). Die Ebene muss senkrecht zu einer Achse liegen.</p>
+        <div class="row"><button id="pickSeal" aria-pressed="false">Fläche anklicken</button></div>
+        <div class="field"><label for="sealCoord">Lage der Ebene [mm]</label><input type="number" id="sealCoord" step="0.5"></div>
+        <div class="field"><label for="pleat">Faltentiefe unter der Ebene [mm]</label><input type="number" id="pleat" value="40" min="5" max="150" step="1"></div>
+        <div class="mono" id="sealInfo">Noch nicht festgelegt</div>
+        <p>Der gelbe Kasten ist nur eine Vorschau. Gerechnet wird mit dem tatsächlichen Innenquerschnitt des Modells. Nach der Prüfung zeigen gelbe Punkte genau diese Filterfläche.</p>
+      </section>
+
+      <section class="step" id="s3" data-state="locked">
+        <h2><span class="num">3</span>Einlass</h2>
+        <p>Klicke auf die Fläche, in der die Einlassöffnung liegt: die Außenwand direkt neben der Öffnung oder den Rand des Stutzens. Steht das Einlassrohr schräg, auf die Stirnfläche (den Rand) des Rohrs klicken – die Rechnung dreht ihr Gitter dann passend zur Rohrachse. Gewählt wird die Öffnung, die dem Klickpunkt am nächsten liegt.</p>
+        <div class="row"><button id="pickInlet" aria-pressed="false">Einlass anklicken</button></div>
+        <div class="mono" id="inletInfo">Noch nicht festgelegt</div>
+      </section>
+
+      <section class="step" id="s3b" data-state="locked">
+        <h2><span class="num">↑</span>Auslass zum LMM <small style="font-weight:400;color:var(--muted)">optional</small></h2>
+        <p>Ohne Auslass wird über der ganzen Filterfläche gleichmäßig abgesaugt. Mit Auslass wird ein Deckelraum über dem Filter ergänzt und an einer Stelle abgesaugt, wie im Original-Oberteil.</p>
+        <label class="row" style="gap:8px;font-size:.9rem"><input type="checkbox" id="outOn"> Auslass berücksichtigen</label>
+        <div class="row"><button id="pickOutlet" aria-pressed="false" disabled>Lage auf der Dichtfläche anklicken</button></div>
+        <div class="field"><label for="outD">Durchmesser Auslass [mm]</label><input type="number" id="outD" value="70" min="20" max="150" step="1" disabled></div>
+        <div class="field"><label for="outH">Höhe Deckelraum über Dichtebene [mm]</label><input type="number" id="outH" value="50" min="10" max="200" step="1" disabled></div>
+        <div class="mono" id="outInfo">Ohne Auslass (gleichmäßige Absaugung)</div>
+      </section>
+
+      <section class="step" id="s4" data-state="locked">
+        <h2><span class="num">4</span>Berechnen</h2>
+        <div class="field"><label for="dx">Zellgröße</label>
+          <select id="dx"><option value="4">4 mm · schnell</option><option value="3" selected>3 mm · Standard</option><option value="2.5">2,5 mm · fein</option><option value="2">2 mm · sehr fein</option></select></div>
+        <div class="field"><label for="filterType">Filter</label>
+          <select id="filterType"><option value="3" selected>Papierfilter neu</option><option value="6">Papierfilter verschmutzt</option><option value="1.5">Sportfilter / Baumwolle</option></select></div>
+        <div class="field"><label for="device">Rechenwerk</label>
+          <select id="device"><option value="auto">Grafikkarte, sonst Prozessor</option><option value="cpu">Nur Prozessor</option></select></div>
+        <details>
+          <summary>Erweiterte Einstellungen</summary>
+          <div class="field"><label for="K">Filterwiderstand K (Δp Filter / Staudruck)</label><input type="number" id="K" value="3" step="0.1" min="0.2"></div>
+          <div class="field"><label for="aniso">Widerstand quer zu den Falten</label><input type="number" id="aniso" value="10" step="1" min="1"></div>
+          <div class="field"><label for="steps">Rechenschritte</label><input type="number" id="steps" value="5000" step="500" min="500"></div>
+          <div class="field"><label for="tau">Viskosität τ</label><input type="number" id="tau" value="0.51" step="0.005" min="0.502"></div>
+          <div class="field"><label for="u">Einlassgeschw. (Gitter)</label><input type="number" id="u" value="0.06" step="0.01" min="0.02" max="0.1"></div>
+        </details>
+        <dl class="facts" id="geoFacts" hidden></dl>
+        <div class="row"><button class="primary" id="run" disabled>Rechnung starten</button><button id="cancel" hidden>Abbrechen</button></div>
+        <div class="prog" id="prog" hidden>
+          <div class="bar"><i id="barFill"></i></div>
+          <div class="mono" id="progText"></div>
+        </div>
+        <div class="msg" id="status" hidden></div>
+      </section>
+    </div>
+
+    <div class="stage">
+    <div class="viewer">
+      <canvas id="c3d" aria-label="3D-Ansicht des Modells"></canvas>
+      <div class="legend3d" id="legend3d" hidden><b id="lgName"></b><canvas id="lgBar" width="180" height="10"></canvas><div class="lt"><span id="lgMin"></span><span id="lgMid"></span><span id="lgMax"></span></div></div>
+      <div class="vhint"><span id="vmode">Ziehen = drehen · Scrollen = zoomen · Rechtsklick = verschieben</span><span class="axes">Modellachsen: X rot · Y grün · Z blau</span></div>
+      <div class="vtools" role="group" aria-label="Modell in der Ansicht drehen">
+        <button id="vFilterUp" title="Dreht die Ansicht so, dass die Filteröffnung nach oben zeigt">Filter oben</button>
+        <button id="vRotX" title="90° um die waagerechte Bildachse drehen">↻ X 90°</button>
+        <button id="vRotY" title="90° um die senkrechte Achse drehen">↻ Y 90°</button>
+        <button id="vRotZ" title="90° um die Blickachse drehen">↻ Z 90°</button>
+        <button id="vFlip" title="Modell auf den Kopf stellen">180°</button>
+        <button id="vReset" title="Originale Lage aus der STL">Zurücksetzen</button>
+        <button id="vFit" title="Modell ins Bild einpassen">Einpassen</button>
+      </div>
+    </div>
+    <div class="viz" id="viz" hidden>
+      <h3>Ergebnis in 3D</h3>
+      <div class="vizrow">
+        <label><input type="checkbox" id="vLines" checked> Stromlinien</label>
+        <label><input type="checkbox" id="vMove"> Luftteilchen bewegen</label>
+        <label><input type="checkbox" id="vSlice" checked> Schnittebene</label>
+        <label>Gehäuse <select id="vHousing"><option value="glass" selected>durchsichtig</option><option value="solid">undurchsichtig</option><option value="off">ausgeblendet</option></select></label>
+      </div>
+      <div class="vizrow">
+        <label>Zeigt <select id="vQty"><option value="spd" selected>Geschwindigkeit</option><option value="loss">Totaldruckverlust</option><option value="pst">Statischer Druck</option><option value="filt">Filteranströmung</option></select></label>
+        <label>Lage <select id="vDir"><option value="d" selected>parallel zum Filter</option><option value="x">längs zur Einlassrichtung</option><option value="z">quer zur Einlassrichtung</option></select></label>
+      </div>
+      <div class="vizrow">
+        <input type="range" id="vPos" min="0" max="10" value="5" step="1" aria-label="Lage der Schnittebene">
+        <span class="mono" id="vPosT"></span>
+      </div>
+      <p class="note" id="vNote">Stromlinien starten gleichmäßig verteilt in der Einlassöffnung und folgen der zeitlich gemittelten Strömung bis durch den Filter. Bereiche ohne Linien werden kaum durchströmt.</p>
+    </div>
+    </div>
+  </div>
+
+
+  <section class="results" id="results" hidden>
+    <div class="sec-h"><h2>Ergebnis</h2><span class="mono" id="resMeta"></span></div>
+    <div class="kpis" id="kpis"></div>
+    <div class="maps">
+      <figure><figcaption>Filteranströmung<small>Mitte Faltenpaket, relativ zum Mittelwert, Blick von der Filterseite. Blau = unterversorgt, Rot = Strahl.</small></figcaption><canvas id="m1"></canvas></figure>
+      <figure><figcaption>Geschwindigkeit auf Einlasshöhe<small id="m2s"></small></figcaption><canvas id="m2"></canvas></figure>
+      <figure><figcaption>Geschwindigkeit unter den Falten<small id="m3s"></small></figcaption><canvas id="m3"></canvas></figure>
+      <figure><figcaption>Längsschnitt durch die Einlassmitte<small id="m4s"></small></figcaption><canvas id="m4"></canvas></figure>
+    </div>
+    <div class="two">
+      <div class="tbl">
+        <table>
+          <thead><tr><th>Variante</th><th>γ Kern</th><th>&lt; 50 %</th><th>Max/Mittel</th><th>ζ</th><th>Einlass</th><th>Rechenwerk</th><th>Dauer</th></tr></thead>
+          <tbody id="runs"></tbody>
+        </table>
+      </div>
+      <div class="calc">
+        <h3>Leistungsrechner</h3>
+        <div class="field"><label for="ps">Motorleistung [PS]</label><input type="number" id="ps" value="150" step="10" min="30"></div>
+        <dl class="facts" id="calcOut"></dl>
+        <p class="note">Benzin-Turbo, rund 0,8 g/s Luft pro PS. Druckverlust nur Rohluftseite ohne Filter und Schlauch, aus ζ der gewählten Variante.</p>
+      </div>
+    </div>
+    <p class="note">Die Rechnung läuft bei kleinerer Reynoldszahl als im Auto, mit Turbulenzmodell. Die Werte eignen sich zum Vergleich von Varianten, nicht als exakte Absolutwerte. γ Kern: Gleichförmigkeitsindex ohne die wandnahe Randzelle (1 = perfekt gleichmäßig, ab 0,9 gut).</p>
+  </section>
+</div>
+
+<script type="text/plain" id="engine-src">__ENGINE__</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const AX = ["X", "Y", "Z"];
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = (v, d = 1) => Number(v).toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
+
+// ---------------- Worker
+const engineURL = URL.createObjectURL(new Blob([$("engine-src").textContent], { type: "text/javascript" }));
+let worker = null, stlBuf = null, stlName = "", silent = false, runStart = 0, lastParams = null;
+const S = { seal: null, inlet: null, pick: null, summary: null, bbox: null, results: [], cur: -1, running: false };
+function newWorker() { worker = new Worker(engineURL); worker.onmessage = onMsg; worker.postMessage({ type: "gpuinfo" }); }
+newWorker();
+
+function status(text, kind = "info") { const s = $("status"); s.hidden = !text; s.textContent = text || ""; s.className = "msg " + kind; }
+function setStep(id, st) { $(id).dataset.state = st; }
+
+function onMsg(e) {
+  const m = e.data;
+  if (m.type === "gpuinfo") {
+    $("gpuTag").textContent = m.ok ? "Grafikkarte: " + m.name : "Keine WebGPU-Grafikkarte · rechnet auf dem Prozessor";
+  } else if (m.type === "loaded") {
+    if (silent) { silent = false; if (S.seal && S.inlet) prepare(); return; }
+    buildMesh(m.tris, m.mn, m.mx);
+    S.bbox = { mn: m.mn, mx: m.mx }; S.seal = null; S.inlet = null; S.summary = null; S.outlet = null;
+    S.modelId = (S.modelId || 0) + 1; clear3D();
+    const f = $("modelFacts"); f.hidden = false;
+    f.innerHTML = `<dt>Datei</dt><dd>${esc(stlName)}</dd><dt>Dreiecke</dt><dd>${m.ntri.toLocaleString("de-DE")}</dd>` +
+      AX.map((a, i) => `<dt>${a}</dt><dd>${fmt(m.mn[i])} … ${fmt(m.mx[i])}</dd>`).join("");
+    setStep("s1", "done"); setStep("s2", "open"); setStep("s3", "locked"); setStep("s4", "locked");
+    $("sealInfo").textContent = "Noch nicht festgelegt"; $("inletInfo").textContent = "Noch nicht festgelegt";
+    $("run").disabled = true; $("geoFacts").hidden = true; status("");
+    updateMarkers();
+  } else if (m.type === "prepared") {
+    S.summary = m.summary; showGeo(m.summary);
+  } else if (m.type === "status") {
+    status(m.text, m.text.includes("nicht") || m.text.includes("Keine") ? "err" : "info");
+  } else if (m.type === "progress") {
+    const i = m.info;
+    $("barFill").style.width = (100 * i.step / i.steps).toFixed(1) + "%";
+    $("progText").textContent = `Schritt ${i.step} / ${i.steps} · γ ${fmt(i.gamma, 3)} · Massenbilanz ${fmt(i.massRatio, 2)} · ` +
+      `${fmt(i.mlups, 1)} Mio. Zellen/s · noch ${Math.max(0, Math.round(i.eta))} s`;
+  } else if (m.type === "result") {
+    S.running = false; uiRunning(false);
+    const r = m.res; r.name = `${stlName.replace(/\.stl$/i, "")} · ${fmt(lastParams.dx, 1)} mm · K ${fmt(lastParams.K, 1)}` + (lastParams.outlet ? ` · Auslass ${lastParams.outlet}` : "");
+    r.seconds = (Date.now() - runStart) / 1000;
+    r.model = S.modelId; S.results.push(r); S.cur = S.results.length - 1;
+    status("Rechnung fertig.", "ok"); renderResults();
+  } else if (m.type === "error") {
+    if (S.running) { S.running = false; uiRunning(false); }
+    status(m.message, "err");
+  }
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// ---------------- Datei laden
+function loadFile(file) {
+  if (!file) return;
+  stlName = file.name;
+  file.arrayBuffer().then((buf) => { stlBuf = buf.slice(0); worker.postMessage({ type: "load", buffer: buf }, [buf]); status("Modell wird geladen …"); });
+}
+$("file").addEventListener("change", (e) => loadFile(e.target.files[0]));
+const drop = $("drop");
+["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", (e) => loadFile(e.dataTransfer.files[0]));
+drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); } });
+drop.tabIndex = 0;
+
+// ---------------- 3D
+const canvas = $("c3d");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 0.5, 20000);
+const controls = new THREE.OrbitControls(camera, canvas); controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x5d666e, 0.8));
+const sun = new THREE.DirectionalLight(0xffffff, 0.65); scene.add(sun);
+const grp = new THREE.Group(); scene.add(grp);
+let mesh = null, axes = null, sealViz = null, inletViz = null, openViz = null, outViz = null, marker = null;
+const meshMat = new THREE.MeshStandardMaterial({ color: 0x8b959e, roughness: .75, metalness: .02, side: THREE.DoubleSide, flatShading: true });
+
+function buildMesh(tris, mn, mx) {
+  if (mesh) { grp.remove(mesh); mesh.geometry.dispose(); }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(tris, 3)); g.computeVertexNormals();
+  mesh = new THREE.Mesh(g, meshMat); grp.add(mesh);
+  if (axes) grp.remove(axes);
+  const size = Math.max(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]);
+  axes = new THREE.AxesHelper(size * 0.25); axes.position.set(mn[0], mn[1], mn[2]); grp.add(axes);
+  grp.quaternion.identity(); S.orientTouched = false;
+  camera.near = size / 200; camera.far = size * 50; camera.updateProjectionMatrix();
+  fitView(true);
+}
+// Ansicht: Modell nur in der Darstellung drehen (Rechnung und Export bleiben in Modellkoordinaten)
+function fitView(resetDir) {
+  if (!mesh) return;
+  grp.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(mesh), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+  const size = Math.max(sz.x, sz.y, sz.z) || 100;
+  let dir = camera.position.clone().sub(controls.target);
+  if (resetDir || dir.lengthSq() < 1e-6) dir = new THREE.Vector3(1.1, 0.9, 1.3);
+  dir.normalize();
+  controls.target.copy(c);
+  camera.position.copy(c.clone().add(dir.multiplyScalar(size * 1.9)));
+  camera.up.set(0, 1, 0); camera.lookAt(c);
+  sun.position.set(c.x + size, c.y + size * 2, c.z + size * 1.5);
+}
+function rotateModel(axis, deg) {
+  if (!mesh) return;
+  const v = new THREE.Vector3(axis === 0 ? 1 : 0, axis === 1 ? 1 : 0, axis === 2 ? 1 : 0);
+  grp.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(v, deg * Math.PI / 180));
+  S.orientTouched = true; fitView(false);
+}
+function filterUp() {
+  if (!mesh || !S.seal) return;
+  const n = new THREE.Vector3(); n.setComponent(S.seal.axis, S.seal.sign);
+  grp.quaternion.setFromUnitVectors(n, new THREE.Vector3(0, 1, 0)); fitView(true);
+}
+
+function clearViz(o) { if (o) { grp.remove(o); o.traverse((x) => { if (x.geometry) x.geometry.dispose(); }); } return null; }
+function updateMarkers() {
+  sealViz = clearViz(sealViz); inletViz = clearViz(inletViz); openViz = clearViz(openViz); outViz = clearViz(outViz);
+  if (!S.bbox) return;
+  const { mn, mx } = S.bbox;
+  if (S.seal && !(S.summary && S.summary.filterPts)) {
+    const a = S.seal.axis, pleat = +$("pleat").value || 0, dir = -S.seal.sign;
+    const lo = [...mn], hi = [...mx]; lo[a] = Math.min(S.seal.coord, S.seal.coord + dir * pleat); hi[a] = Math.max(S.seal.coord, S.seal.coord + dir * pleat);
+    const box = new THREE.BoxGeometry(hi[0] - lo[0] || 0.5, hi[1] - lo[1] || 0.5, hi[2] - lo[2] || 0.5);
+    sealViz = new THREE.Group();
+    const m = new THREE.Mesh(box, new THREE.MeshBasicMaterial({ color: new THREE.Color(css("--seal")), transparent: true, opacity: .22, depthWrite: false }));
+    m.position.set((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2); sealViz.add(m);
+    const e = new THREE.LineSegments(new THREE.EdgesGeometry(box), new THREE.LineBasicMaterial({ color: new THREE.Color(css("--seal")) }));
+    e.position.copy(m.position); sealViz.add(e); grp.add(sealViz);
+  }
+  if (S.summary && S.summary.filterPts) {
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(S.summary.filterPts), 3));
+    sealViz = new THREE.Points(g, new THREE.PointsMaterial({ color: new THREE.Color(css("--seal")), size: +$("dx").value * 0.8, sizeAttenuation: true, transparent: true, opacity: .8 }));
+    grp.add(sealViz);
+  }
+  if (S.summary && S.summary.openPts) {
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(S.summary.openPts), 3));
+    openViz = new THREE.Points(g, new THREE.PointsMaterial({ color: new THREE.Color(css("--pick")), size: +$("dx").value, sizeAttenuation: true }));
+    grp.add(openViz);
+  }
+  if (S.summary && S.summary.outletPts && S.summary.outletPts.length) {
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(S.summary.outletPts), 3));
+    const ov = new THREE.Points(g, new THREE.PointsMaterial({ color: new THREE.Color(css("--accent")), size: +$("dx").value * 1.1, sizeAttenuation: true }));
+    outViz = ov; grp.add(ov);
+  }
+  if (sealViz && typeof V3D !== "undefined" && V3D.r) sealViz.visible = false;
+  if (S.inlet) {
+    const sz = Math.max(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]);
+    inletViz = new THREE.Mesh(new THREE.SphereGeometry(sz * 0.012, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(css("--pick")) }));
+    inletViz.position.set(...S.inlet.point); grp.add(inletViz);
+  }
+}
+
+// Klick-Auswahl
+const ray = new THREE.Raycaster(); let downAt = null;
+canvas.addEventListener("pointerdown", (e) => { downAt = [e.clientX, e.clientY]; });
+canvas.addEventListener("pointerup", (e) => {
+  if (!S.pick || !mesh || !downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
+  const r = canvas.getBoundingClientRect();
+  ray.setFromCamera({ x: ((e.clientX - r.left) / r.width) * 2 - 1, y: -((e.clientY - r.top) / r.height) * 2 + 1 }, camera);
+  const hit = ray.intersectObject(mesh, false)[0]; if (!hit) return;
+  const pos = mesh.geometry.attributes.position, fi = hit.faceIndex * 3;
+  const A = new THREE.Vector3().fromBufferAttribute(pos, fi), B = new THREE.Vector3().fromBufferAttribute(pos, fi + 1), C = new THREE.Vector3().fromBufferAttribute(pos, fi + 2);
+  const n = new THREE.Vector3().subVectors(B, A).cross(new THREE.Vector3().subVectors(C, A)).normalize();
+  const ldir = ray.ray.direction.clone().applyQuaternion(grp.quaternion.clone().invert());
+  if (n.dot(ldir) > 0) n.negate();
+  const comp = [n.x, n.y, n.z], axis = comp.map(Math.abs).indexOf(Math.max(...comp.map(Math.abs))), sign = Math.sign(comp[axis]);
+  const lp = grp.worldToLocal(hit.point.clone()), p = [lp.x, lp.y, lp.z];
+  let yaw = 0, iaxis = axis, isign = sign;
+  if (S.pick === "inlet" && S.seal) {
+    // Einlass darf schraeg in der Dichtebene liegen (z. B. Rohr unter 37 Grad): Normale in die Ebene projizieren
+    const pc = comp.slice(); pc[S.seal.axis] = 0; const pl = Math.hypot(...pc);
+    if (pl < 0.7) { status("Die angeklickte Fläche zeigt nach oben oder unten. Bitte auf die Fläche klicken, in der die Einlassöffnung liegt.", "err"); return; }
+    const pn = pc.map((v) => v / pl), cand = [0, 1, 2].filter((a) => a !== S.seal.axis);
+    iaxis = Math.abs(pn[cand[0]]) >= Math.abs(pn[cand[1]]) ? cand[0] : cand[1]; isign = Math.sign(pn[iaxis]);
+    const oAx = 3 - S.seal.axis - iaxis, a = pn[oAx], b = -isign * pn[iaxis];
+    yaw = Math.atan2(a, -b) * 180 / Math.PI; if (Math.abs(yaw) < 2) yaw = 0; else yaw = Math.round(yaw * 10) / 10;
+  }
+  if (Math.abs(comp[axis]) < 0.9 && S.pick !== "outlet" && S.pick !== "inlet") { status("Die angeklickte Fläche ist schräg. Bitte eine achsparallele Fläche wählen.", "err"); return; }
+  if (S.pick === "outlet") {
+    if (!S.seal) return;
+    const q = p.slice(); q[S.seal.axis] = S.seal.coord;
+    S.outlet = q; outText(); setPick(null); status(""); updateMarkers(); if (S.inlet) prepare(); return;
+  }
+  if (S.pick === "seal") {
+    S.seal = { axis, sign, coord: Math.round(p[axis] * 10) / 10 };
+    $("sealCoord").value = S.seal.coord; sealText(); setStep("s2", "done"); setStep("s3", S.inlet ? "done" : "open");
+    if (!S.orientTouched) filterUp();
+  } else {
+    if (S.seal && iaxis === S.seal.axis) { status("Der Einlass muss auf einer anderen Seite liegen als die Filterebene.", "err"); return; }
+    S.inlet = { axis: iaxis, sign: isign, point: p, yaw };
+    $("inletInfo").textContent = `Seite ${isign > 0 ? "+" : "−"}${AX[iaxis]}${yaw ? ` · schräg, ${fmt(Math.abs(yaw), 1)}° gedreht` : ""} · Klick bei ${p.map((v) => fmt(v, 0)).join(" / ")}`;
+    setStep("s3", "done"); setStep("s3b", "open");
+  }
+  setPick(null); status(""); updateMarkers();
+  if (S.seal && S.inlet) prepare();
+});
+function setPick(mode) {
+  S.pick = mode;
+  $("pickSeal").setAttribute("aria-pressed", mode === "seal"); $("pickInlet").setAttribute("aria-pressed", mode === "inlet"); $("pickOutlet").setAttribute("aria-pressed", mode === "outlet");
+  const v = $("vmode"); v.classList.toggle("pickmode", !!mode);
+  v.textContent = mode === "seal" ? "Klicke auf die Dichtfläche des Filters" : mode === "inlet" ? "Klicke auf die Fläche, in der die Einlassöffnung liegt (bei schrägem Rohr: auf den Rohrrand)" : mode === "outlet" ? "Klicke auf den Flansch oder in den Kasten, wo der Auslass sitzt" : "Ziehen = drehen · Scrollen = zoomen · Rechtsklick = verschieben";
+  canvas.style.cursor = mode ? "crosshair" : "";
+}
+$("pickSeal").addEventListener("click", () => { if (mesh) setPick(S.pick === "seal" ? null : "seal"); });
+$("pickInlet").addEventListener("click", () => { if (mesh && S.seal) setPick(S.pick === "inlet" ? null : "inlet"); });
+$("pickOutlet").addEventListener("click", () => { if (mesh && S.seal) setPick(S.pick === "outlet" ? null : "outlet"); });
+function outText() {
+  const on = $("outOn").checked;
+  ["pickOutlet", "outD", "outH"].forEach((id) => { $(id).disabled = !on; });
+  $("outInfo").textContent = !on ? "Ohne Auslass (gleichmäßige Absaugung)" : S.outlet
+    ? `Auslass Ø ${fmt(+$("outD").value, 0)} mm bei ${S.outlet.map((v) => fmt(v, 0)).join(" / ")} · Deckelraum ${fmt(+$("outH").value, 0)} mm` : "Lage noch nicht gewählt";
+  setStep("s3b", on && S.outlet ? "done" : (S.inlet ? "open" : "locked"));
+}
+$("outOn").addEventListener("change", () => { outText(); updateMarkers(); if (S.seal && S.inlet && (!$("outOn").checked || S.outlet)) prepare(); });
+["outD", "outH"].forEach((id) => $(id).addEventListener("change", () => { outText(); if (S.seal && S.inlet && S.outlet) prepare(); }));
+function sealText() {
+  if (!S.seal) return;
+  $("sealInfo").textContent = `Ebene ${AX[S.seal.axis]} = ${fmt(S.seal.coord)} mm · Kasten liegt in ${S.seal.sign > 0 ? "−" : "+"}${AX[S.seal.axis]}`;
+}
+$("sealCoord").addEventListener("change", () => { if (!S.seal) return; S.seal.coord = +$("sealCoord").value; sealText(); updateMarkers(); if (S.inlet) prepare(); });
+$("pleat").addEventListener("change", () => { updateMarkers(); if (S.seal && S.inlet) prepare(); });
+$("dx").addEventListener("change", () => { $("steps").value = Math.round(5000 * 3 / +$("dx").value / 500) * 500; if (S.seal && S.inlet) prepare(); });
+$("filterType").addEventListener("change", () => { $("K").value = $("filterType").value; });
+
+function prepare() {
+  if (S.running) return;
+  if (V3D.r) clear3D();
+  S.summary = null; $("run").disabled = true; status("Geometrie wird geprüft …");
+  worker.postMessage({ type: "prepare", params: { dx: +$("dx").value, sealAxis: S.seal.axis, sealSign: S.seal.sign, seal: S.seal.coord,
+    inletAxis: S.inlet.axis, inletSign: S.inlet.sign, inletYaw: S.inlet.yaw || 0, click: S.inlet.point, pleat: +$("pleat").value,
+    outlet: $("outOn").checked && S.outlet ? { enabled: true, center: S.outlet, diameter: +$("outD").value, height: +$("outH").value } : null } });
+}
+function showGeo(s) {
+  const f = $("geoFacts"); f.hidden = false;
+  f.innerHTML = `<dt>Einlassfläche</dt><dd>${fmt(s.inlet_cm2, 0)} cm²</dd><dt>Filterfläche</dt><dd>${fmt(s.filter_cm2, 0)} cm²</dd>` +
+    `<dt>Luftraum</dt><dd>${fmt(s.volume_l, 2)} l</dd><dt>Rechenzellen</dt><dd>${s.cells.toLocaleString("de-DE")}</dd>` +
+    `<dt>Öffnungen auf der Seite</dt><dd>${s.nHoles}</dd>`;
+  const warn = [];
+  if (!s.pleatOk) warn.push("Faltentiefe ist kleiner als eine Zelle.");
+  if (s.filter_cm2 < 20) warn.push("Filterfläche sehr klein – Dichtebene prüfen.");
+  if (s.outlet_cm2 > s.filter_cm2 * 1.6) warn.push("Auslassfläche deutlich größer als die Filterfläche – ist der Kasten dicht?");
+  status(warn.length ? warn.join(" ") : "Geometrie in Ordnung. Grün: erkannte Einlassöffnung. Gelb: Filterfläche, mit der gerechnet wird (Innenquerschnitt in halber Faltentiefe). Orange: Auslass.", warn.length ? "err" : "ok");
+  setStep("s4", "open"); $("run").disabled = false; updateMarkers();
+}
+
+// ---------------- Rechnen
+function uiRunning(on) {
+  $("run").hidden = on; $("cancel").hidden = !on; $("prog").hidden = !on;
+  ["pickSeal", "pickInlet", "dx", "pleat", "sealCoord", "filterType", "device"].forEach((id) => { $(id).disabled = on; });
+}
+$("run").addEventListener("click", () => {
+  if (!S.summary) return;
+  const steps = Math.max(500, +$("steps").value);
+  lastParams = { device: $("device").value, K: +$("K").value, aniso: +$("aniso").value, u: +$("u").value, tau: Math.max(0.502, +$("tau").value),
+    outlet: $("outOn").checked && S.outlet ? S.outlet.map((v) => fmt(v, 0)).join("/") : "",
+    steps, avg: Math.round(steps / 3), every: Math.max(100, Math.round(steps / 40 / 50) * 50), dx: +$("dx").value };
+  S.running = true; runStart = Date.now(); uiRunning(true); $("barFill").style.width = "0%"; $("progText").textContent = "Startet …";
+  worker.postMessage({ type: "run", params: lastParams });
+});
+$("cancel").addEventListener("click", () => {
+  worker.terminate(); S.running = false; uiRunning(false); status("Rechnung abgebrochen.", "info");
+  newWorker(); silent = true; const b = stlBuf.slice(0); worker.postMessage({ type: "load", buffer: b }, [b]);
+});
+
+// ---------------- Ergebnisse
+const DIV = [[0, [43, 93, 158]], [0.5, [244, 244, 242]], [1, [178, 48, 43]]];
+const SEQ = [[0, [11, 10, 31]], [0.2, [59, 28, 90]], [0.4, [140, 41, 129]], [0.6, [222, 73, 104]], [0.8, [254, 159, 109]], [1, [252, 253, 191]]];
+function cmap(stops, t) {
+  t = Math.min(1, Math.max(0, t));
+  for (let i = 1; i < stops.length; i++) if (t <= stops[i][0]) {
+    const [a, ca] = stops[i - 1], [b, cb] = stops[i], f = (t - a) / (b - a);
+    return ca.map((v, k) => Math.round(v + (cb[k] - v) * f));
+  }
+  return stops[stops.length - 1][1];
+}
+/* o: n1, n2, val(i1,i2), vec(i1,i2)->[a,b] (a nach rechts, b nach oben), t(v)->0..1, stops, ticks1/ticks2: [{at:index, label}], xlabel, ylabel, flipY, cbar:{labels:[[t,text]]} */
+function drawMap(cv, o) {
+  const W = cv.clientWidth || 600, ml = 46, mb = 36, mt = 8, mr = 64;
+  const cell = Math.max(1.5, Math.min((W - ml - mr) / o.n1, 520 / o.n2));
+  const pw = cell * o.n1, ph = cell * o.n2, H = Math.ceil(ph + mt + mb);
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.height = H + "px";
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  const img = new ImageData(o.n1, o.n2);
+  for (let a = 0; a < o.n1; a++) for (let b = 0; b < o.n2; b++) {
+    const v = o.val(a, b), row = o.flipY ? b : o.n2 - 1 - b, p = (row * o.n1 + (o.flipX ? o.n1 - 1 - a : a)) * 4;
+    if (Number.isNaN(v)) { img.data[p + 3] = 0; continue; }
+    const c = cmap(o.stops, o.t(v)); img.data[p] = c[0]; img.data[p + 1] = c[1]; img.data[p + 2] = c[2]; img.data[p + 3] = 255;
+  }
+  const tmp = document.createElement("canvas"); tmp.width = o.n1; tmp.height = o.n2; tmp.getContext("2d").putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = false; ctx.drawImage(tmp, ml, mt, pw, ph);
+  // Pfeile
+  if (o.vec) {
+    const st = Math.max(1, Math.round(15 / cell)); ctx.strokeStyle = o.arrowColor || "rgba(255,255,255,.75)"; ctx.lineWidth = 1;
+    for (let a = Math.floor(st / 2); a < o.n1; a += st) for (let b = Math.floor(st / 2); b < o.n2; b += st) {
+      const v = o.vec(a, b); if (!v || Number.isNaN(v[0])) continue;
+      const len = Math.hypot(v[0], v[1]); if (len < 0.02) continue;
+      const L = Math.min(1, len) * st * cell * 0.85, dxv = (o.flipX ? -1 : 1) * v[0] / len * L, dyv = (o.flipY ? 1 : -1) * v[1] / len * L;
+      const x0 = ml + ((o.flipX ? o.n1 - 1 - a : a) + 0.5) * cell - dxv / 2, y0 = mt + ((o.flipY ? b : o.n2 - 1 - b) + 0.5) * cell - dyv / 2;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + dxv, y0 + dyv);
+      const ang = Math.atan2(dyv, dxv), hl = Math.min(4, L * 0.4);
+      ctx.lineTo(x0 + dxv - hl * Math.cos(ang - 0.5), y0 + dyv - hl * Math.sin(ang - 0.5));
+      ctx.moveTo(x0 + dxv, y0 + dyv); ctx.lineTo(x0 + dxv - hl * Math.cos(ang + 0.5), y0 + dyv - hl * Math.sin(ang + 0.5)); ctx.stroke();
+    }
+  }
+  // Achsen
+  const fg = css("--muted"); ctx.fillStyle = fg; ctx.strokeStyle = css("--line"); ctx.font = `11px ${css("--f-mono")}`;
+  ctx.strokeRect(ml, mt, pw, ph);
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  for (const t of o.ticks1) { const x = ml + ((o.flipX ? o.n1 - 1 - t.at : t.at) + 0.5) * cell; ctx.fillText(t.label, x, mt + ph + 4); ctx.beginPath(); ctx.moveTo(x, mt + ph); ctx.lineTo(x, mt + ph + 3); ctx.stroke(); }
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (const t of o.ticks2) { const y = mt + ((o.flipY ? t.at : o.n2 - 1 - t.at) + 0.5) * cell; ctx.fillText(t.label, ml - 5, y); ctx.beginPath(); ctx.moveTo(ml - 3, y); ctx.lineTo(ml, y); ctx.stroke(); }
+  ctx.font = `12px ${css("--f-body")}`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+  ctx.fillText(o.xlabel, ml + pw / 2, H - 2);
+  ctx.save(); ctx.translate(11, mt + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "middle"; ctx.fillText(o.ylabel, 0, 0); ctx.restore();
+  // Farbskala
+  const bx = ml + pw + 14, bh = Math.min(ph, 220), by = mt + (ph - bh) / 2;
+  for (let y = 0; y < bh; y++) { const c = cmap(o.stops, 1 - y / bh); ctx.fillStyle = `rgb(${c})`; ctx.fillRect(bx, by + y, 10, 1.2); }
+  ctx.fillStyle = fg; ctx.font = `10.5px ${css("--f-mono")}`; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  for (const [t, lab] of o.cbar) ctx.fillText(lab, bx + 14, by + (1 - t) * bh);
+}
+function ticks(coords, map, n = 5) {
+  const lo = Math.min(map(coords[0]), map(coords[coords.length - 1])), hi = Math.max(map(coords[0]), map(coords[coords.length - 1]));
+  const raw = (hi - lo) / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 5, 10].map((m) => m * mag).find((s) => s >= raw);
+  const out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+    let best = 0, bd = Infinity; coords.forEach((c, i) => { const d = Math.abs(map(c) - v); if (d < bd) { bd = d; best = i; } });
+    out.push({ at: best, label: String(Math.round(v)) });
+  }
+  return out;
+}
+const tDiv = (v) => (v <= 1 ? v * 0.5 : 0.5 + (v - 1) / 1.5 * 0.5);
+
+function renderResults() {
+  const r = S.results[S.cur]; if (!r) return;
+  $("results").hidden = false;
+  if (r.model === S.modelId) show3D(r); else clear3D();
+  const M = r.metrics, fr = r.frame;
+  const verdict = M.gammaCore >= 0.95 ? ["sehr gleichmäßig", "good"] : M.gammaCore >= 0.9 ? ["gut", "good"] : M.gammaCore >= 0.8 ? ["mäßig", "warn"] : ["ungleichmäßig", "bad"];
+  $("resMeta").textContent = `${r.name} · ${r.device} · ${fmt(r.seconds, 0)} s`;
+  $("kpis").innerHTML =
+    `<div class="kpi"><span>Gleichförmigkeit γ (Kern)</span><b>${fmt(M.gammaCore, 3)}</b><span class="chip ${verdict[1]}">${verdict[0]}</span></div>` +
+    `<div class="kpi"><span>Filterfläche unter 50 %</span><b>${fmt(M.lowCore * 100, 1)} %</b><span>Strahlzonen über 150 %: ${fmt(M.highCore * 100, 1)} %</span></div>` +
+    `<div class="kpi"><span>Höchste Anströmung</span><b>${fmt(M.maxToMean, 2)} ×</b><span>des Mittelwerts</span></div>` +
+    `<div class="kpi"><span>Verlustbeiwert Rohluftseite ζ</span><b>${fmt(M.zeta, 2)}</b><span>× Staudruck im Einlass</span></div>`;
+  const rot = fr.yaw ? "′" : "", xl = `${AX[fr.oAx]}${rot} [mm]`, zl = `${AX[fr.iAx]}${rot} [mm]` + (fr.yaw ? ` · Gitter ${fmt(Math.abs(fr.yaw), 1)}° gedreht (Rohrachse)` : "");
+  const mapZ = (z) => -fr.si * z;
+  const t1 = ticks(r.xc, (x) => x), t2 = ticks(r.zc, mapZ);
+  // Draufsichten immer so, wie man von der Filterseite in den Kasten schaut (nicht gespiegelt)
+  const dirM = (X, D, Z) => { const y = (fr.yaw || 0) * Math.PI / 180, cy = Math.cos(y), sy = Math.sin(y), q = [0, 0, 0];
+    q[fr.oAx] = cy * X - sy * Z; q[fr.dAx] = -fr.sd * D; q[fr.iAx] = -fr.si * (sy * X + cy * Z); return q; };
+  const ex = dirM(1, 0, 0), ez = dirM(0, 0, 1), up = dirM(0, -1, 0);
+  const flipX = ((ex[1] * ez[2] - ex[2] * ez[1]) * up[0] + (ex[2] * ez[0] - ex[0] * ez[2]) * up[1] + (ex[0] * ez[1] - ex[1] * ez[0]) * up[2]) < 0;
+  drawMap($("m1"), { n1: r.nx, n2: r.nz, flipX, val: (i, k) => r.fmap[i * r.nz + k], t: tDiv, stops: DIV, ticks1: t1, ticks2: t2, xlabel: xl, ylabel: zl,
+    cbar: [[0, "0"], [0.5, "1,0"], [tDiv(1.5), "1,5"], [1, "2,5"]] });
+  const sp = (pl, vmax, id, sub, txt) => {
+    $(sub).textContent = txt;
+    drawMap($(id), { n1: pl.n1, n2: pl.n2, flipX, val: (i, k) => pl.speed[i * pl.n2 + k], vec: (i, k) => [pl.ua[i * pl.n2 + k], pl.ub[i * pl.n2 + k]],
+      t: (v) => v / vmax, stops: SEQ, ticks1: t1, ticks2: t2, xlabel: xl, ylabel: zl, cbar: [[0, "0"], [0.5, fmt(vmax / 2, 1)], [1, fmt(vmax, 1)]] });
+  };
+  sp(r.planInlet, 1.2, "m2", "m2s", `Tiefe ${fmt(r.planInlet.depth, 0)} mm unter der Dichtebene · Betrag relativ zur Einlassgeschwindigkeit · Blick von der Filterseite`);
+  sp(r.planLow, 0.8, "m3", "m3s", `Tiefe ${fmt(r.planLow.depth, 0)} mm (12 mm unter den Falten) · zeigt, welche Bereiche den Filter speisen · Blick von der Filterseite`);
+  const L = r.lon; $("m4s").textContent = `${AX[fr.oAx]}${rot} = ${fmt(L.x, 0)} mm · Einlass links, Faltenzone oben`;
+  drawMap($("m4"), { n1: L.n1, n2: L.n2, flipY: true, val: (k, j) => L.speed[k * L.n2 + j], vec: (k, j) => [L.ua[k * L.n2 + j], -L.ub[k * L.n2 + j]],
+    t: (v) => v / 1.2, stops: SEQ, ticks1: ticks(r.zc, mapZ), ticks2: ticks(r.dc, (d) => d), xlabel: zl, ylabel: "Tiefe ab Dichtebene [mm]",
+    cbar: [[0, "0"], [0.5, "0,6"], [1, "1,2"]] });
+  $("runs").innerHTML = S.results.map((x, n) => `<tr data-n="${n}" class="${n === S.cur ? "sel" : ""}"><td>${esc(x.name)}</td><td>${fmt(x.metrics.gammaCore, 3)}</td>` +
+    `<td>${fmt(x.metrics.lowCore * 100, 1)} %</td><td>${fmt(x.metrics.maxToMean, 2)}</td><td>${fmt(x.metrics.zeta, 2)}</td><td>${fmt(x.metrics.inlet_cm2, 0)} cm²</td>` +
+    `<td>${esc(x.device.split(" · ")[0])}</td><td>${fmt(x.seconds, 0)} s</td></tr>`).join("");
+  calc();
+}
+$("runs").addEventListener("click", (e) => { const tr = e.target.closest("tr"); if (!tr) return; S.cur = +tr.dataset.n; renderResults(); });
+function calc() {
+  const r = S.results[S.cur]; if (!r) return;
+  const ps = +$("ps").value || 0, gs = ps * 0.79, vdot = gs / 1000 / 1.2, A = r.metrics.inlet_cm2 / 1e4, v = vdot / A, q = 0.6 * v * v;
+  $("calcOut").innerHTML = `<dt>Luftmasse</dt><dd>${fmt(gs, 0)} g/s</dd><dt>Geschwindigkeit im Einlass</dt><dd>${fmt(v, 1)} m/s</dd>` +
+    `<dt>Staudruck</dt><dd>${fmt(q / 100, 1)} mbar</dd><dt>Verlust Rohluftseite</dt><dd>${fmt(r.metrics.zeta * q / 100, 1)} mbar</dd>`;
+}
+$("ps").addEventListener("input", calc);
+
+
+// ---------------- 3D-Ergebnis: Stromlinien, Schnittebene, Filteranströmung
+const LOSS = [[0, [246, 244, 236]], [0.3, [243, 196, 98]], [0.65, [212, 98, 44]], [1, [104, 26, 44]]];
+const QTY = {
+  spd: { name: "Geschwindigkeit", stops: SEQ, unit: (v) => fmt(v, 1) + " ×" },
+  loss: { name: "Totaldruckverlust seit Einlass", stops: LOSS, unit: (v) => fmt(v, 1) + " q" },
+  pst: { name: "Statischer Druck (0 = unter dem Filter)", stops: DIV, unit: (v) => (v > 0 ? "+" : "") + fmt(v, 1) + " q" },
+  filt: { name: "Filteranströmung, relativ zum Mittel", stops: DIV, unit: (v) => fmt(v, 1) + " ×" },
+};
+const V3D = { r: null, lines: null, slice: null, parts: null, ps: null, t0: 0 };
+function frameOf(f) {
+  const yaw = (f.yaw || 0) * Math.PI / 180, cy = Math.cos(yaw), sy = Math.sin(yaw);
+  return (X, D, Z) => { const q = [0, 0, 0]; q[f.oAx] = cy * X - sy * Z; q[f.dAx] = f.seal - f.sd * D; q[f.iAx] = -f.si * (sy * X + cy * Z); return q; };
+}
+// Wertebereiche je Rechnung (Druckgrößen aus dem Raum unter dem Filter, damit der Filter selbst die Skala nicht erdrückt)
+function ranges3D(r) {
+  if (r.vol.rng) return r.vol.rng;
+  const v = r.vol, L = [], P = [];
+  for (let i = 0; i < v.nx; i++) for (let j = v.jm; j < v.ny; j++) for (let k = v.kB; k < v.nz; k += 1) {
+    const c = (i * v.ny + j) * v.nz + k, d = v.d0 + j * v.h; if (d <= v.pleat || v.loss[c] !== v.loss[c]) continue;
+    L.push(v.loss[c]); P.push(v.pst[c]);
+  }
+  const pick = (a, q) => { if (!a.length) return 1; a.sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(q * a.length))]; };
+  const lmax = Math.max(0.5, pick(L.slice(), 0.98)), pm = Math.max(0.2, Math.abs(pick(P.slice(), 0.02)), Math.abs(pick(P.slice(), 0.98)));
+  v.rng = { spd: [0, 1.2], loss: [0, lmax], pst: [-pm, pm], filt: [0, 2.5] };
+  return v.rng;
+}
+function sliceInfo(r) {
+  const v = r.vol, dir = $("vQty").value === "filt" ? "d" : $("vDir").value;
+  const lo = dir === "d" ? v.top + 1 : dir === "x" ? 0 : v.kB, hi = (dir === "d" ? v.ny : dir === "x" ? v.nx : v.nz) - 1;
+  return { dir, lo, hi };
+}
+function setSliceRange(r, keep) {
+  const s = sliceInfo(r), el = $("vPos"), v = r.vol;
+  el.min = s.lo; el.max = s.hi; el.disabled = $("vQty").value === "filt";
+  if (!keep) {
+    if (s.dir === "d") el.value = Math.min(s.hi, Math.max(s.lo, Math.round((v.pleat + 12 - v.d0) / v.h)));
+    else if (s.dir === "x") { const P = r.lon && r.lon.x; el.value = P !== undefined ? Math.round((P - v.x0) / v.h) : Math.round((s.lo + s.hi) / 2); }
+    else el.value = Math.min(s.hi, s.lo + Math.round(40 / v.h));
+  }
+  if ($("vQty").value === "filt") el.value = v.jm;
+}
+function clear3D() {
+  for (const k of ["lines", "slice", "parts"]) V3D[k] = clearViz(V3D[k]);
+  V3D.r = null; V3D.ps = null; $("viz").hidden = true; $("legend3d").hidden = true; setHousing();
+}
+function setHousing() {
+  if (!mesh) return;
+  const m = V3D.r ? $("vHousing").value : "solid";
+  mesh.visible = m !== "off";
+  meshMat.transparent = m === "glass"; meshMat.opacity = m === "glass" ? 0.16 : 1; meshMat.depthWrite = m !== "glass"; meshMat.needsUpdate = true;
+  if (sealViz) sealViz.visible = !V3D.r;
+}
+function show3D(r) {
+  if (!r || !r.vol || !mesh) return;
+  const fresh = V3D.r !== r; V3D.r = r; $("viz").hidden = false;
+  if (fresh) setSliceRange(r, false);
+  buildLines(); buildSlice(); setHousing();
+}
+function buildLines() {
+  V3D.lines = clearViz(V3D.lines); V3D.parts = clearViz(V3D.parts); V3D.ps = null;
+  const r = V3D.r; if (!r || !$("vLines").checked) return;
+  const L = r.lines, nl = L.off.length - 1; let ns = 0;
+  for (let l = 0; l < nl; l++) ns += Math.max(0, L.off[l + 1] - L.off[l] - 1);
+  const pos = new Float32Array(ns * 6), col = new Float32Array(ns * 6); let q = 0;
+  for (let l = 0; l < nl; l++) for (let p = L.off[l]; p < L.off[l + 1] - 1; p++) for (const s of [p, p + 1]) {
+    pos.set(L.pts.subarray(3 * s, 3 * s + 3), q * 3); const c = cmap(SEQ, 0.12 + 0.88 * L.spd[s] / 1.2); col.set([c[0] / 255, c[1] / 255, c[2] / 255], q * 3); q++;
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  V3D.lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: $("vMove").checked ? 0.35 : 0.9 }));
+  grp.add(V3D.lines);
+  if ($("vMove").checked) {
+    // Je Stromlinie drei Teilchen, Fortschritt proportional zur örtlichen Geschwindigkeit
+    const np = nl * 3, pp = new Float32Array(np * 3), state = new Float32Array(np);
+    for (let i = 0; i < np; i++) state[i] = (i % 3) / 3;
+    const g2 = new THREE.BufferGeometry(); g2.setAttribute("position", new THREE.BufferAttribute(pp, 3));
+    const sz = Math.max(S.bbox.mx[0] - S.bbox.mn[0], S.bbox.mx[1] - S.bbox.mn[1], S.bbox.mx[2] - S.bbox.mn[2]);
+    V3D.parts = new THREE.Points(g2, new THREE.PointsMaterial({ color: new THREE.Color(css("--fg")), size: sz * 0.008, sizeAttenuation: true }));
+    V3D.ps = { state, nl, pp }; grp.add(V3D.parts); V3D.t0 = performance.now();
+  }
+}
+function animate3D() {
+  const P = V3D.ps, r = V3D.r; if (!P || !r) return;
+  const now = performance.now(), dt = Math.min(0.1, (now - V3D.t0) / 1000); V3D.t0 = now;
+  const L = r.lines;
+  for (let i = 0; i < P.state.length; i++) {
+    const l = Math.floor(i / 3), a = L.off[l], n = L.off[l + 1] - a; if (n < 2) continue;
+    const s = P.state[i] * (n - 1), p = Math.min(n - 2, Math.floor(s)), f = s - p, sp = L.spd[a + p];
+    P.state[i] = (P.state[i] + dt * (0.15 + sp) * 14 / n) % 1;
+    for (let c = 0; c < 3; c++) P.pp[3 * i + c] = L.pts[3 * (a + p) + c] * (1 - f) + L.pts[3 * (a + p + 1) + c] * f;
+  }
+  V3D.parts.geometry.attributes.position.needsUpdate = true;
+}
+function buildSlice() {
+  V3D.slice = clearViz(V3D.slice);
+  const r = V3D.r; if (!r) return;
+  const qty = $("vQty").value, Q = QTY[qty], rg = ranges3D(r)[qty], v = r.vol, s = sliceInfo(r), idx = +$("vPos").value;
+  drawLegend(Q, rg, qty);
+  if (!$("vSlice").checked && qty !== "filt") { posText(r, s.dir, idx); return; }
+  const W = s.dir === "x" ? v.nz : v.nx, H = s.dir === "d" ? v.nz : v.ny, data = new Uint8Array(W * H * 4);
+  const tf = qty === "filt" ? tDiv : (x) => (x - rg[0]) / (rg[1] - rg[0]);
+  for (let a = 0; a < W; a++) for (let b = 0; b < H; b++) {
+    let val;
+    if (qty === "filt") val = r.fmap[a * v.nz + b];
+    else {
+      const [i, j, k] = s.dir === "d" ? [a, idx, b] : s.dir === "x" ? [idx, b, a] : [a, b, idx];
+      val = v[qty][(i * v.ny + j) * v.nz + k];
+    }
+    if (val !== val) continue;
+    const c = cmap(Q.stops, tf(val)), o = (b * W + a) * 4; data[o] = c[0]; data[o + 1] = c[1]; data[o + 2] = c[2]; data[o + 3] = 235;
+  }
+  const tex = new THREE.DataTexture(data, W, H, THREE.RGBAFormat); tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.needsUpdate = true;
+  const M = frameOf(r.frame), h = v.h, xa = v.x0 - h / 2, xb = v.x0 + (v.nx - 0.5) * h, za = v.z0 - h / 2, zb = v.z0 + (v.nz - 0.5) * h, da = v.d0 - h / 2, db = v.d0 + (v.ny - 0.5) * h;
+  const j = qty === "filt" ? v.jm : idx;
+  const P = s.dir === "d" ? [M(xa, v.d0 + j * h, za), M(xb, v.d0 + j * h, za), M(xb, v.d0 + j * h, zb), M(xa, v.d0 + j * h, zb)]
+    : s.dir === "x" ? [M(v.x0 + idx * h, da, za), M(v.x0 + idx * h, da, zb), M(v.x0 + idx * h, db, zb), M(v.x0 + idx * h, db, za)]
+    : [M(xa, da, v.z0 + idx * h), M(xb, da, v.z0 + idx * h), M(xb, db, v.z0 + idx * h), M(xa, db, v.z0 + idx * h)];
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(P.flat()), 3));
+  g.setAttribute("uv", new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2));
+  g.setIndex([0, 1, 2, 0, 2, 3]);
+  V3D.slice = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+  grp.add(V3D.slice); posText(r, s.dir, j);
+}
+function posText(r, dir, idx) {
+  const v = r.vol, rot = r.frame.yaw ? "′" : "";
+  $("vPosT").textContent = $("vQty").value === "filt" ? `Mitte Faltenpaket, ${fmt(v.d0 + v.jm * v.h, 0)} mm unter der Dichtebene`
+    : dir === "d" ? `${fmt(v.d0 + idx * v.h, 0)} mm unter der Dichtebene` + (v.d0 + idx * v.h <= v.pleat ? " (im Faltenpaket)" : "")
+    : dir === "x" ? `${AX[r.frame.oAx]}${rot} = ${fmt(v.x0 + idx * v.h, 0)} mm`
+    : `${fmt(v.z0 + idx * v.h - v.zIn, 0)} mm hinter der Einlassöffnung`;
+}
+function drawLegend(Q, rg, qty) {
+  const lg = $("legend3d"); lg.hidden = false; $("lgName").textContent = Q.name;
+  const cv = $("lgBar"), c = cv.getContext("2d");
+  for (let x = 0; x < cv.width; x++) { const t = x / (cv.width - 1), col = cmap(Q.stops, t); c.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`; c.fillRect(x, 0, 1, cv.height); }
+  if (qty === "filt") { $("lgMin").textContent = "0"; $("lgMid").textContent = "1,0"; $("lgMax").textContent = "2,5 ×"; return; }
+  $("lgMin").textContent = Q.unit(rg[0]); $("lgMid").textContent = Q.unit((rg[0] + rg[1]) / 2); $("lgMax").textContent = Q.unit(rg[1]);
+}
+$("vLines").addEventListener("change", buildLines);
+$("vMove").addEventListener("change", buildLines);
+$("vSlice").addEventListener("change", buildSlice);
+$("vHousing").addEventListener("change", setHousing);
+$("vQty").addEventListener("change", () => { if (V3D.r) { setSliceRange(V3D.r, $("vQty").value !== "filt" && $("vDir").value === sliceInfo(V3D.r).dir); buildSlice(); } });
+$("vDir").addEventListener("change", () => { if (V3D.r) { setSliceRange(V3D.r, false); buildSlice(); } });
+$("vPos").addEventListener("input", () => { if (V3D.r) buildSlice(); });
+try { if (matchMedia("(prefers-reduced-motion: reduce)").matches) $("vMove").checked = false; } catch (e) { }
+
+// ---------------- Ansicht drehen
+$("vRotX").addEventListener("click", () => rotateModel(0, 90));
+$("vRotY").addEventListener("click", () => rotateModel(1, 90));
+$("vRotZ").addEventListener("click", () => rotateModel(2, 90));
+$("vFlip").addEventListener("click", () => rotateModel(0, 180));
+$("vReset").addEventListener("click", () => { if (!mesh) return; grp.quaternion.identity(); S.orientTouched = true; fitView(true); });
+$("vFit").addEventListener("click", () => fitView(false));
+$("vFilterUp").addEventListener("click", () => { S.orientTouched = true; filterUp(); });
+
+
+// ---------------- Theme & Schleife
+function applyTheme() { scene.background = new THREE.Color(css("--stage")); updateMarkers(); if (S.cur >= 0) renderResults(); }
+applyTheme();
+try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme); } catch (e) { }
+new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+let rT = 0; addEventListener("resize", () => { clearTimeout(rT); rT = setTimeout(() => { if (S.cur >= 0) renderResults(); }, 200); });
+function loop() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== Math.floor(w * renderer.getPixelRatio()) || canvas.height !== Math.floor(h * renderer.getPixelRatio())) {
+    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  }
+  animate3D(); controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop);
+}
+loop();
+</script>

@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Airbox-Strömungsanalyse</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -55,6 +56,8 @@ details[open]{display:flex;flex-direction:column;gap:7px}
 .vhint{position:absolute;left:10px;top:10px;right:10px;display:flex;justify-content:space-between;gap:8px;pointer-events:none;font-size:.8rem}
 .vhint span{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:4px 8px;color:var(--muted)}
 .vhint .pickmode{color:var(--fg);border-color:var(--pick)}
+.vtools{position:absolute;left:10px;bottom:10px;right:10px;display:flex;flex-wrap:wrap;gap:6px}
+.vtools button{font-size:.82rem;padding:4px 9px;background:var(--surface)}
 .axes{font-family:var(--f-mono)}
 .prog{display:flex;flex-direction:column;gap:6px}
 .bar{height:8px;border-radius:4px;background:var(--sunk);overflow:hidden}
@@ -89,6 +92,17 @@ tbody tr{cursor:pointer}
 .calc{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
 .calc h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:1.05rem}
 .note{font-size:.84rem;color:var(--muted);margin:0;max-width:75ch}
+.stage{display:flex;flex-direction:column;gap:10px;min-width:0}
+.viz{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:9px}
+.viz h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:1.02rem;letter-spacing:.02em}
+.vizrow{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:.88rem}
+.vizrow label{display:inline-flex;align-items:center;gap:6px}
+.vizrow select{width:auto;max-width:100%}
+input[type=range]{accent-color:var(--accent);flex:1 1 180px;min-width:0}
+.legend3d{position:absolute;right:10px;top:46px;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:6px 8px;display:flex;flex-direction:column;gap:3px;font-size:.76rem;color:var(--muted);pointer-events:none;max-width:calc(100% - 20px)}
+.legend3d canvas{width:180px;height:10px;display:block;border-radius:2px;max-width:100%}
+.legend3d .lt{display:flex;justify-content:space-between;gap:10px;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.legend3d b{font-weight:600;color:var(--fg)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -114,13 +128,24 @@ tbody tr{cursor:pointer}
         <div class="field"><label for="sealCoord">Lage der Ebene [mm]</label><input type="number" id="sealCoord" step="0.5"></div>
         <div class="field"><label for="pleat">Faltentiefe unter der Ebene [mm]</label><input type="number" id="pleat" value="40" min="5" max="150" step="1"></div>
         <div class="mono" id="sealInfo">Noch nicht festgelegt</div>
+        <p>Der gelbe Kasten ist nur eine Vorschau. Gerechnet wird mit dem tatsächlichen Innenquerschnitt des Modells. Nach der Prüfung zeigen gelbe Punkte genau diese Filterfläche.</p>
       </section>
 
       <section class="step" id="s3" data-state="locked">
         <h2><span class="num">3</span>Einlass</h2>
-        <p>Klicke auf die Außenwand direkt neben der Einlassöffnung (oder auf den Rand des Stutzens). Gewählt wird die Öffnung, die dem Klickpunkt am nächsten liegt.</p>
-        <div class="row"><button id="pickInlet" aria-pressed="false">Wand am Einlass anklicken</button></div>
+        <p>Klicke auf die Fläche, in der die Einlassöffnung liegt: die Außenwand direkt neben der Öffnung oder den Rand des Stutzens. Steht das Einlassrohr schräg, auf die Stirnfläche (den Rand) des Rohrs klicken – die Rechnung dreht ihr Gitter dann passend zur Rohrachse. Gewählt wird die Öffnung, die dem Klickpunkt am nächsten liegt.</p>
+        <div class="row"><button id="pickInlet" aria-pressed="false">Einlass anklicken</button></div>
         <div class="mono" id="inletInfo">Noch nicht festgelegt</div>
+      </section>
+
+      <section class="step" id="s3b" data-state="locked">
+        <h2><span class="num">↑</span>Auslass zum LMM <small style="font-weight:400;color:var(--muted)">optional</small></h2>
+        <p>Ohne Auslass wird über der ganzen Filterfläche gleichmäßig abgesaugt. Mit Auslass wird ein Deckelraum über dem Filter ergänzt und an einer Stelle abgesaugt, wie im Original-Oberteil.</p>
+        <label class="row" style="gap:8px;font-size:.9rem"><input type="checkbox" id="outOn"> Auslass berücksichtigen</label>
+        <div class="row"><button id="pickOutlet" aria-pressed="false" disabled>Lage auf der Dichtfläche anklicken</button></div>
+        <div class="field"><label for="outD">Durchmesser Auslass [mm]</label><input type="number" id="outD" value="70" min="20" max="150" step="1" disabled></div>
+        <div class="field"><label for="outH">Höhe Deckelraum über Dichtebene [mm]</label><input type="number" id="outH" value="50" min="10" max="200" step="1" disabled></div>
+        <div class="mono" id="outInfo">Ohne Auslass (gleichmäßige Absaugung)</div>
       </section>
 
       <section class="step" id="s4" data-state="locked">
@@ -149,17 +174,48 @@ tbody tr{cursor:pointer}
       </section>
     </div>
 
+    <div class="stage">
     <div class="viewer">
       <canvas id="c3d" aria-label="3D-Ansicht des Modells"></canvas>
-      <div class="vhint"><span id="vmode">Ziehen = drehen · Scrollen = zoomen · Rechtsklick = verschieben</span><span class="axes">X rot · Y grün · Z blau</span></div>
+      <div class="legend3d" id="legend3d" hidden><b id="lgName"></b><canvas id="lgBar" width="180" height="10"></canvas><div class="lt"><span id="lgMin"></span><span id="lgMid"></span><span id="lgMax"></span></div></div>
+      <div class="vhint"><span id="vmode">Ziehen = drehen · Scrollen = zoomen · Rechtsklick = verschieben</span><span class="axes">Modellachsen: X rot · Y grün · Z blau</span></div>
+      <div class="vtools" role="group" aria-label="Modell in der Ansicht drehen">
+        <button id="vFilterUp" title="Dreht die Ansicht so, dass die Filteröffnung nach oben zeigt">Filter oben</button>
+        <button id="vRotX" title="90° um die waagerechte Bildachse drehen">↻ X 90°</button>
+        <button id="vRotY" title="90° um die senkrechte Achse drehen">↻ Y 90°</button>
+        <button id="vRotZ" title="90° um die Blickachse drehen">↻ Z 90°</button>
+        <button id="vFlip" title="Modell auf den Kopf stellen">180°</button>
+        <button id="vReset" title="Originale Lage aus der STL">Zurücksetzen</button>
+        <button id="vFit" title="Modell ins Bild einpassen">Einpassen</button>
+      </div>
+    </div>
+    <div class="viz" id="viz" hidden>
+      <h3>Ergebnis in 3D</h3>
+      <div class="vizrow">
+        <label><input type="checkbox" id="vLines" checked> Stromlinien</label>
+        <label><input type="checkbox" id="vMove"> Luftteilchen bewegen</label>
+        <label><input type="checkbox" id="vSlice" checked> Schnittebene</label>
+        <label>Gehäuse <select id="vHousing"><option value="glass" selected>durchsichtig</option><option value="solid">undurchsichtig</option><option value="off">ausgeblendet</option></select></label>
+      </div>
+      <div class="vizrow">
+        <label>Zeigt <select id="vQty"><option value="spd" selected>Geschwindigkeit</option><option value="loss">Totaldruckverlust</option><option value="pst">Statischer Druck</option><option value="filt">Filteranströmung</option></select></label>
+        <label>Lage <select id="vDir"><option value="d" selected>parallel zum Filter</option><option value="x">längs zur Einlassrichtung</option><option value="z">quer zur Einlassrichtung</option></select></label>
+      </div>
+      <div class="vizrow">
+        <input type="range" id="vPos" min="0" max="10" value="5" step="1" aria-label="Lage der Schnittebene">
+        <span class="mono" id="vPosT"></span>
+      </div>
+      <p class="note" id="vNote">Stromlinien starten gleichmäßig verteilt in der Einlassöffnung und folgen der zeitlich gemittelten Strömung bis durch den Filter. Bereiche ohne Linien werden kaum durchströmt.</p>
+    </div>
     </div>
   </div>
+
 
   <section class="results" id="results" hidden>
     <div class="sec-h"><h2>Ergebnis</h2><span class="mono" id="resMeta"></span></div>
     <div class="kpis" id="kpis"></div>
     <div class="maps">
-      <figure><figcaption>Filteranströmung<small>Mitte Faltenpaket, relativ zum Mittelwert. Blau = unterversorgt, Rot = Strahl.</small></figcaption><canvas id="m1"></canvas></figure>
+      <figure><figcaption>Filteranströmung<small>Mitte Faltenpaket, relativ zum Mittelwert, Blick von der Filterseite. Blau = unterversorgt, Rot = Strahl.</small></figcaption><canvas id="m1"></canvas></figure>
       <figure><figcaption>Geschwindigkeit auf Einlasshöhe<small id="m2s"></small></figcaption><canvas id="m2"></canvas></figure>
       <figure><figcaption>Geschwindigkeit unter den Falten<small id="m3s"></small></figcaption><canvas id="m3"></canvas></figure>
       <figure><figcaption>Längsschnitt durch die Einlassmitte<small id="m4s"></small></figcaption><canvas id="m4"></canvas></figure>
@@ -182,7 +238,8 @@ tbody tr{cursor:pointer}
   </section>
 </div>
 
-<script type="text/plain" id="engine-src">/* Airbox-Stroemungskern: Voxelisierung + Lattice-Boltzmann D3Q19 (laeuft im Web Worker oder in Node) */
+<script type="text/plain" id="engine-src">/* Airbox Flow – Rechenkern: STL einlesen, voxelisieren, Lattice-Boltzmann D3Q19 auf Grafikkarte (WebGPU) oder Prozessor.
+   Laeuft im Web Worker der Seite oder in Node (module.exports). */
 "use strict";
 const CX = [0, 1, -1, 0, 0, 0, 0, 1, -1, 1, -1, 1, -1, 1, -1, 0, 0, 0, 0];
 const CY = [0, 0, 0, 1, -1, 0, 0, 1, -1, -1, 1, 0, 0, 0, 0, 1, -1, 1, -1];
@@ -215,10 +272,13 @@ function makeFrame(p) {
   const dAx = p.sealAxis, iAx = p.inletAxis;
   if (dAx === iAx) throw new Error("Einlassseite und Filterebene liegen auf derselben Achse.");
   const oAx = 3 - dAx - iAx, sd = p.sealSign, si = p.inletSign, seal = p.seal;
+  // Schraeger Einlass: lokales Gitter um die Tiefenachse gedreht, damit die Rohrachse auf -Z liegt
+  const yaw = (p.inletYaw || 0) * Math.PI / 180, cy = Math.cos(yaw), sy = Math.sin(yaw);
   return {
-    dAx, iAx, oAx, sd, si, seal,
-    toLocal: (q) => [q[oAx], -sd * (q[dAx] - seal), -si * q[iAx]],
-    toModel: (X, D, Z) => { const q = [0, 0, 0]; q[oAx] = X; q[dAx] = seal - sd * D; q[iAx] = -si * Z; return q; },
+    dAx, iAx, oAx, sd, si, seal, yaw: p.inletYaw || 0,
+    toLocal: (q) => { const a = q[oAx], b = -si * q[iAx]; return [cy * a + sy * b, -sd * (q[dAx] - seal), -sy * a + cy * b]; },
+    toModel: (X, D, Z) => { const q = [0, 0, 0]; q[oAx] = cy * X - sy * Z; q[dAx] = seal - sd * D; q[iAx] = -si * (sy * X + cy * Z); return q; },
+    dirToModel: (X, D, Z) => { const q = [0, 0, 0]; q[oAx] = cy * X - sy * Z; q[dAx] = -sd * D; q[iAx] = -si * (sy * X + cy * Z); return q; },
   };
 }
 
@@ -297,7 +357,8 @@ function prepare(p) {
     for (let a = 0; a < 3; a++) { T[v * 3 + a] = L[a]; if (L[a] < mn[a]) mn[a] = L[a]; if (L[a] > mx[a]) mx[a] = L[a]; }
   }
   const h = p.dx, sub = 3, hf = h / sub, duct = 10;
-  const origin = [mn[0] - h, mn[1] - h, mn[2] - duct * h];
+  const out = p.outlet && p.outlet.enabled ? p.outlet : null;
+  const origin = [mn[0] - h, (out ? Math.min(mn[1], -out.height) : mn[1]) - h, mn[2] - duct * h];
   const nx = Math.ceil((mx[0] - origin[0] + h) / h), ny = Math.ceil((mx[1] - origin[1] + h) / h), nz = Math.ceil((mx[2] - origin[2] + h) / h);
   const N = nx * ny * nz;
   if (N > 4.5e6) throw new Error(`Gitter zu groß (${(N / 1e6).toFixed(1)} Mio. Zellen) – Zellgröße erhöhen.`);
@@ -366,27 +427,55 @@ function prepare(p) {
     if (j > 0) visit(c - nz, j - 1); if (j < ny - 1) visit(c + nz, j + 1);
     if (k > 0) visit(c - 1, j); if (k < nz - 1) visit(c + 1, j);
   }
+  // Dichtheit: erreicht die Luft den Gitterrand, ist sie durch eine zu duenne Wand nach aussen gelaufen
+  let leaked = 0;
+  for (let i = 0; i < nx && !leaked; i++) for (let j = top; j < ny && !leaked; j++) for (let k = kw0; k < nz; k++) {
+    if ((i === 0 || i === nx - 1 || k === nz - 1) && fluid[(i * ny + j) * nz + k]) { leaked = 1; break; }
+  }
+  if (leaked) throw new Error(`Bei ${h} mm Zellgröße läuft die Luft durch eine zu dünne Wand nach außen (Wände sollten mindestens so dick wie eine Zelle sein). Bitte eine kleinere Zellgröße wählen.`);
+  // Reinluftseite: Deckelraum ueber der Filterflaeche mit Auslass an waehlbarer Stelle
+  const outlet = new Uint8Array(N); const outletPts = []; let nOut = 0;
+  if (out) {
+    const jpt = firstGE(dc, -out.height);
+    if (jpt >= top) throw new Error("Deckelhöhe ist kleiner als eine Zelle.");
+    const L = fr.toLocal(out.center), r2 = (out.diameter / 2) ** 2;
+    for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) {
+      if (!fluid[(i * ny + top) * nz + k]) continue;
+      for (let j = jpt; j < top; j++) { const c = (i * ny + j) * nz + k; fluid[c] = 1; solid[c] = 0; qt++; }
+      if ((xc[i] - L[0]) ** 2 + (zc[k] - L[2]) ** 2 <= r2) {
+        outlet[(i * ny + jpt) * nz + k] = 1; nOut++;
+        const q = fr.toModel(xc[i], dc[jpt], zc[k]); outletPts.push(q[0], q[1], q[2]);
+      }
+    }
+    if (nOut < 4) throw new Error("Der Auslass liegt nicht über der Filterfläche oder ist zu klein.");
+  } else {
+    for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) { const c = (i * ny + top) * nz + k; if (fluid[c]) { outlet[c] = 1; nOut++; } }
+  }
   const nf = qt;
   const jm = firstGE(dc, p.pleat / 2);
   let Af = 0; for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) Af += fluid[(i * ny + jm) * nz + k];
   // Vorschau-Punkte der Oeffnung (Modellkoordinaten)
-  const openPts = [];
+  const openPts = [], filterPts = [];
+  for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) if (fluid[(i * ny + jm) * nz + k]) {
+    const q = fr.toModel(xc[i], dc[jm], zc[k]); filterPts.push(q[0], q[1], q[2]);
+  }
   for (let c = 0; c < nx * ny; c++) if (opening[c]) {
     const m = fr.toModel(xc[(c / ny) | 0], dc[c % ny], mn[2]); openPts.push(m[0], m[1], m[2]);
   }
   let leak = 0; for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) leak += fluid[(i * ny + top) * nz + k];
   return {
-    fr, h, nx, ny, nz, N, xc, dc, zc, solid, fluid, opening, top, jm, nf, mn, mx, pleat: p.pleat,
+    fr, h, nx, ny, nz, N, xc, dc, zc, solid, fluid, opening, outlet, top, jm, nf, mn, mx, pleat: p.pleat,
     summary: {
       grid: [nx, ny, nz], cells: nf, volume_l: nf * h ** 3 / 1e6, inlet_cm2: nOpen * h * h / 100,
-      filter_cm2: Af * h * h / 100, outlet_cm2: leak * h * h / 100, nHoles: comps.length, openPts,
+      filter_cm2: Af * h * h / 100, outlet_cm2: leak * h * h / 100, nHoles: comps.length, openPts, filterPts, outletPts, outlet_cm2_real: out ? nOut * h * h / 100 : 0,
       pleatOk: jm > top,
     },
   };
 }
 
 /* ---------------------------------------------------------------- Lattice-Boltzmann
-   p = {K, aniso, u, tau, steps, avg, every} */
+   p = {K, aniso, u, tau, steps, avg, every}
+   Optionale feste Einbauten: ns[a] in 0..1 (partieller Bounce-back, 1 = Wand) */
 function setupSim(g, p) {
   const { ny, nz, N, fluid, opening, top, dc } = g;
   const NF = g.nf, cid = new Int32Array(N).fill(-1), cells = new Int32Array(NF);
@@ -401,7 +490,7 @@ function setupSim(g, p) {
     jsOf[a] = j;
     for (let i = 0; i < 19; i++) { const s = c - off[i]; nb[a * 19 + i] = s >= 0 && s < N ? cid[s] : -1; }
     if (k === 0 && opening[ij]) { flag[a] = 1; Ain++; }
-    else if (j === top) flag[a] = 2;
+    else if (g.outlet[c]) flag[a] = 2;
     else if (dc[j] > dc[top] && dc[j] <= g.pleat) flag[a] = 3;
   }
   const layerM = [], layerT = [];
@@ -410,11 +499,11 @@ function setupSim(g, p) {
   const u0 = p.u, uface = u0 * Ain / Af, sig = p.K * 0.5 * u0 * u0 / (uface * Math.max(Lp, 1));
   const f0 = new Float32Array(19 * NF);
   for (let i = 0; i < 19; i++) f0.fill(WT[i], i * NF, (i + 1) * NF);
-  return { NF, cid, cells, nb, flag, Ain, Af, sig, layerM, layerT, f0,
+  return { NF, cid, cells, nb, flag, jsOf, Ain, Af, sig, layerM, layerT, f0,
     u0, tau0: p.tau, aniso: p.aniso, cs2s: 18 * Math.SQRT2 * 0.17 * 0.17 };
 }
 
-function cpuStep(S, f, f2, acc) {
+function cpuStep(S, f, f2, acc, ns) {
   const { NF, nb, flag, u0, tau0, sig, aniso, cs2s } = S;
   const fi = S._fi || (S._fi = new Float64Array(19)), fe = S._fe || (S._fe = new Float64Array(19));
   for (let a = 0; a < NF; a++) {
@@ -461,8 +550,11 @@ function cpuStep(S, f, f2, acc) {
         }
         ux = 0.5 * (ux + ex); uy = 0.5 * (uy + ey); uz = 0.5 * (uz + ez);  // physikalische Geschwindigkeit
       }
-      const it = 1 / tau;
-      for (let i = 0; i < 19; i++) f2[i * NF + a] = fi[i] - (fi[i] - fe[i]) * it;
+      const it = 1 / tau, sv = ns ? ns[a] : 0;
+      if (sv > 0) {
+        for (let i = 0; i < 19; i++) f2[i * NF + a] = (1 - sv) * (fi[i] - (fi[i] - fe[i]) * it) + sv * fi[OPP[i]];
+        ux *= 1 - sv; uy *= 1 - sv; uz *= 1 - sv;
+      } else for (let i = 0; i < 19; i++) f2[i * NF + a] = fi[i] - (fi[i] - fe[i]) * it;
     }
     if (acc) { acc[a] += ux; acc[NF + a] += uy; acc[2 * NF + a] += uz; acc[3 * NF + a] += rho; }
   }
@@ -486,14 +578,14 @@ function progressInfo(S, vy, step, steps, t0, hist) {
   return { step, steps, gamma: gam, massRatio: mr, elapsed: el, eta: el / step * (steps - step), mlups: S.NF * step / el / 1e6 };
 }
 
-function simulate(g, p, onProgress) {
+function simulate(g, p, onProgress, ns) {
   const S = setupSim(g, p), NF = S.NF;
   let f = S.f0.slice(), f2 = new Float32Array(19 * NF);
   const acc = new Float32Array(4 * NF); let nacc = 0;
   const probeList = S.layerM.concat(S.layerT), t0 = Date.now(), hist = [];
   for (let step = 1; step <= p.steps; step++) {
     const doAcc = step > p.steps - p.avg;
-    cpuStep(S, f, f2, doAcc ? acc : null);
+    cpuStep(S, f, f2, doAcc ? acc : null, ns);
     const tmp = f; f = f2; f2 = tmp;
     if (doAcc) nacc++;
     if (step % p.every === 0 || step === p.steps) {
@@ -502,18 +594,19 @@ function simulate(g, p, onProgress) {
     }
   }
   for (let x = 0; x < 4 * NF; x++) acc[x] /= Math.max(nacc, 1);
-  return evaluate(g, p, acc, S.cells, S.cid, hist, S.Ain, S.Af);
+  return evaluate(g, p, acc, S.cells, S.cid, hist, S.Ain, S.Af, ns);
 }
 
-/* ---------------------------------------------------------------- WebGPU */
+/* ---------------------------------------------------------------- WebGPU (mehrere Varianten gleichzeitig) */
 const WGSL = /* wgsl */`
-struct P { nf: u32, doacc: u32, nprobe: u32, pad0: u32, u0: f32, tau0: f32, sig: f32, aniso: f32, cs2s: f32, pad1: f32, pad2: f32, pad3: f32 };
+struct P { nf: u32, doacc: u32, nprobe: u32, nb: u32, u0: f32, tau0: f32, sig: f32, aniso: f32, cs2s: f32, nlist: u32, pad2: f32, pad3: f32 };
 @group(0) @binding(0) var<uniform> prm: P;
 @group(0) @binding(1) var<storage, read> fin: array<f32>;
 @group(0) @binding(2) var<storage, read_write> fout: array<f32>;
 @group(0) @binding(3) var<storage, read> nb: array<i32>;
 @group(0) @binding(4) var<storage, read> flg: array<u32>;
 @group(0) @binding(5) var<storage, read_write> acc: array<f32>;
+@group(0) @binding(8) var<storage, read> ns: array<f32>;
 
 var<private> CX: array<f32, 19> = array<f32, 19>(0., 1., -1., 0., 0., 0., 0., 1., -1., 1., -1., 1., -1., 1., -1., 0., 0., 0., 0.);
 var<private> CY: array<f32, 19> = array<f32, 19>(0., 0., 0., 1., -1., 0., 0., 1., -1., -1., 1., 0., 0., 0., 0., 1., -1., 1., -1.);
@@ -524,16 +617,19 @@ var<private> OPP: array<u32, 19> = array<u32, 19>(0u, 2u, 1u, 4u, 3u, 6u, 5u, 8u
 
 @compute @workgroup_size(128)
 fn lbm_step(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgroups) ng: vec3<u32>) {
-  let a = gid.x + gid.y * ng.x * 128u;
+  let gi = gid.x + gid.y * ng.x * 128u;
   let NF = prm.nf;
-  if (a >= NF) { return; }
+  if (gi >= NF * prm.nb) { return; }
+  let b = gi / NF;
+  let a = gi - b * NF;
+  let fb = b * 19u * NF;
   var fi: array<f32, 19>;
   var fe: array<f32, 19>;
   var rho = 0.0; var mx = 0.0; var my = 0.0; var mz = 0.0;
   for (var i = 0u; i < 19u; i = i + 1u) {
     let s = nb[a * 19u + i];
     var v: f32;
-    if (s >= 0) { v = fin[i * NF + u32(s)]; } else { v = fin[OPP[i] * NF + a]; }
+    if (s >= 0) { v = fin[fb + i * NF + u32(s)]; } else { v = fin[fb + OPP[i] * NF + a]; }
     fi[i] = v; rho = rho + v; mx = mx + CX[i] * v; my = my + CY[i] * v; mz = mz + CZ[i] * v;
   }
   var ux = mx / rho; var uy = my / rho; var uz = mz / rho;
@@ -549,7 +645,7 @@ fn lbm_step(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgrou
     let usq = 1.5 * (ux * ux + uy * uy + uz * uz);
     for (var i = 0u; i < 19u; i = i + 1u) {
       let cu = 3.0 * (CX[i] * ux + CY[i] * uy + CZ[i] * uz);
-      fout[i * NF + a] = WT[i] * rho * (1.0 + cu + 0.5 * cu * cu - usq);
+      fout[fb + i * NF + a] = WT[i] * rho * (1.0 + cu + 0.5 * cu * cu - usq);
     }
   } else {
     var usq = 1.5 * (ux * ux + uy * uy + uz * uz);
@@ -576,10 +672,20 @@ fn lbm_step(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgrou
       ux = 0.5 * (ux + ex); uy = 0.5 * (uy + ey); uz = 0.5 * (uz + ez);
     }
     let it = 1.0 / tau;
-    for (var i = 0u; i < 19u; i = i + 1u) { fout[i * NF + a] = fi[i] - (fi[i] - fe[i]) * it; }
+    let s = ns[b * NF + a];
+    if (s > 0.0) {
+      for (var i = 0u; i < 19u; i = i + 1u) {
+        fout[fb + i * NF + a] = (1.0 - s) * (fi[i] - (fi[i] - fe[i]) * it) + s * fi[OPP[i]];
+      }
+      ux = ux * (1.0 - s); uy = uy * (1.0 - s); uz = uz * (1.0 - s);
+    } else {
+      for (var i = 0u; i < 19u; i = i + 1u) { fout[fb + i * NF + a] = fi[i] - (fi[i] - fe[i]) * it; }
+    }
   }
   if (prm.doacc == 1u) {
-    acc[a] = acc[a] + ux; acc[NF + a] = acc[NF + a] + uy; acc[2u * NF + a] = acc[2u * NF + a] + uz; acc[3u * NF + a] = acc[3u * NF + a] + rho;
+    let ab = b * 4u * NF;
+    acc[ab + a] = acc[ab + a] + ux; acc[ab + NF + a] = acc[ab + NF + a] + uy;
+    acc[ab + 2u * NF + a] = acc[ab + 2u * NF + a] + uz; acc[ab + 3u * NF + a] = acc[ab + 3u * NF + a] + rho;
   }
 }
 
@@ -594,6 +700,20 @@ fn probe(@builtin(global_invocation_id) gid: vec3<u32>) {
   for (var i = 0u; i < 19u; i = i + 1u) { let v = fin[i * NF + a]; r = r + v; my = my + CY[i] * v; }
   pout[n] = my / r;
 }
+
+// Gemittelte Werte aus acc fuer eine Liste (Zelle, Komponente) und alle Varianten einsammeln
+@group(0) @binding(9) var<storage, read> glist: array<u32>;
+@group(0) @binding(10) var<storage, read_write> gout: array<f32>;
+@group(0) @binding(11) var<storage, read> accr: array<f32>;
+@compute @workgroup_size(64)
+fn gather(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let n = gid.x;
+  let total = prm.nlist * prm.nb;
+  if (n >= total) { return; }
+  let b = n / prm.nlist; let m = n - b * prm.nlist;
+  let cell = glist[2u * m]; let comp = glist[2u * m + 1u];
+  gout[n] = accr[b * 4u * prm.nf + comp * prm.nf + cell];
+}
 `;
 
 async function gpuDevice() {
@@ -603,30 +723,37 @@ async function gpuDevice() {
   if (!adapter) return null;
   const lim = adapter.limits;
   const device = await adapter.requestDevice({ requiredLimits: {
-    maxStorageBufferBindingSize: lim.maxStorageBufferBindingSize, maxBufferSize: lim.maxBufferSize } });
+    maxStorageBufferBindingSize: lim.maxStorageBufferBindingSize, maxBufferSize: lim.maxBufferSize,
+    maxStorageBuffersPerShaderStage: Math.min(lim.maxStorageBuffersPerShaderStage, 10) } });
   let name = "";
   try { const info = adapter.info || (adapter.requestAdapterInfo ? await adapter.requestAdapterInfo() : {}); name = [info.vendor, info.architecture, info.description].filter(Boolean).join(" "); } catch (e) { }
-  return { device, name: name || "Grafikkarte" };
+  return { device, name: name || "Grafikkarte", maxBinding: Math.min(lim.maxStorageBufferBindingSize, lim.maxBufferSize) };
 }
 
 class GpuSim {
-  constructor(dev, S) {
-    const d = this.d = dev.device; this.S = S; const NF = S.NF;
+  /* B Varianten gleichzeitig; ns: Float32Array(B*NF) oder null; glist: Uint32Array [cell,comp,...] fuer gather */
+  constructor(dev, S, B = 1, ns = null, glist = null) {
+    const d = this.d = dev.device; this.S = S; this.B = B; const NF = S.NF;
     const mk = (size, usage, data) => {
       const b = d.createBuffer({ size: Math.max(16, Math.ceil(size / 4) * 4), usage, mappedAtCreation: !!data });
       if (data) { new data.constructor(b.getMappedRange()).set(data); b.unmap(); }
       return b;
     };
     const ST = GPUBufferUsage.STORAGE, CS = GPUBufferUsage.COPY_SRC, CD = GPUBufferUsage.COPY_DST;
-    this.fA = mk(19 * NF * 4, ST | CS | CD, S.f0); this.fB = mk(19 * NF * 4, ST | CS | CD, S.f0);
+    const finit = new Float32Array(19 * NF * B); for (let b = 0; b < B; b++) finit.set(S.f0, b * 19 * NF);
+    this.fA = mk(19 * NF * B * 4, ST | CS | CD, finit); this.fB = mk(19 * NF * B * 4, ST | CS | CD, finit);
     this.nb = mk(NF * 19 * 4, ST, S.nb); this.flg = mk(NF * 4, ST, S.flag);
-    this.acc = mk(4 * NF * 4, ST | CS | CD);
+    this.acc = mk(4 * NF * B * 4, ST | CS | CD);
+    this.ns = mk(NF * B * 4, ST | CD, ns || new Float32Array(NF * B));
     const plist = Uint32Array.from(S.layerM.concat(S.layerT)); this.np = plist.length;
     this.plist = mk(plist.length * 4, ST, plist); this.pout = mk(plist.length * 4, ST | CS);
     this.pread = mk(plist.length * 4, GPUBufferUsage.MAP_READ | CD);
+    this.nl = glist ? glist.length / 2 : 1;
+    this.glist = mk(Math.max(8, this.nl * 8), ST, glist || new Uint32Array(2));
+    this.gout = mk(this.nl * B * 4, ST | CS); this.gread = mk(this.nl * B * 4, GPUBufferUsage.MAP_READ | CD);
     const prm = (doacc) => {
       const ab = new ArrayBuffer(48), u = new Uint32Array(ab), fl = new Float32Array(ab);
-      u[0] = NF; u[1] = doacc; u[2] = plist.length; fl[4] = S.u0; fl[5] = S.tau0; fl[6] = S.sig; fl[7] = S.aniso; fl[8] = S.cs2s;
+      u[0] = NF; u[1] = doacc; u[2] = plist.length; u[3] = B; fl[4] = S.u0; fl[5] = S.tau0; fl[6] = S.sig; fl[7] = S.aniso; fl[8] = S.cs2s; u[9] = this.nl;
       const b = d.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | CD }); d.queue.writeBuffer(b, 0, ab); return b;
     };
     this.p0 = prm(0); this.p1 = prm(1);
@@ -634,19 +761,26 @@ class GpuSim {
     this.modPromise = mod.getCompilationInfo ? mod.getCompilationInfo() : Promise.resolve({ messages: [] });
     const E = (b, type) => ({ binding: b, visibility: GPUShaderStage.COMPUTE, buffer: { type } });
     const layoutS = d.createBindGroupLayout({ entries: [E(0, "uniform"), E(1, "read-only-storage"), E(2, "storage"),
-      E(3, "read-only-storage"), E(4, "read-only-storage"), E(5, "storage")] });
+      E(3, "read-only-storage"), E(4, "read-only-storage"), E(5, "storage"), E(8, "read-only-storage")] });
     const layoutP = d.createBindGroupLayout({ entries: [E(0, "uniform"), E(1, "read-only-storage"), E(6, "read-only-storage"), E(7, "storage")] });
-    this.pipeS = d.createComputePipeline({ layout: d.createPipelineLayout({ bindGroupLayouts: [layoutS] }), compute: { module: mod, entryPoint: "lbm_step" } });
-    this.pipeP = d.createComputePipeline({ layout: d.createPipelineLayout({ bindGroupLayouts: [layoutP] }), compute: { module: mod, entryPoint: "probe" } });
+    const layoutG = d.createBindGroupLayout({ entries: [E(0, "uniform"), E(9, "read-only-storage"), E(10, "storage"), E(11, "read-only-storage")] });
+    const pl = (l) => d.createPipelineLayout({ bindGroupLayouts: [l] });
+    this.pipeS = d.createComputePipeline({ layout: pl(layoutS), compute: { module: mod, entryPoint: "lbm_step" } });
+    this.pipeP = d.createComputePipeline({ layout: pl(layoutP), compute: { module: mod, entryPoint: "probe" } });
+    this.pipeG = d.createComputePipeline({ layout: pl(layoutG), compute: { module: mod, entryPoint: "gather" } });
     const bg = (pb, fin, fout) => d.createBindGroup({ layout: layoutS, entries: [
       { binding: 0, resource: { buffer: pb } }, { binding: 1, resource: { buffer: fin } }, { binding: 2, resource: { buffer: fout } },
-      { binding: 3, resource: { buffer: this.nb } }, { binding: 4, resource: { buffer: this.flg } }, { binding: 5, resource: { buffer: this.acc } }] });
+      { binding: 3, resource: { buffer: this.nb } }, { binding: 4, resource: { buffer: this.flg } }, { binding: 5, resource: { buffer: this.acc } },
+      { binding: 8, resource: { buffer: this.ns } }] });
     this.bg = { 0: [bg(this.p0, this.fA, this.fB), bg(this.p0, this.fB, this.fA)], 1: [bg(this.p1, this.fA, this.fB), bg(this.p1, this.fB, this.fA)] };
     const bgp = (fin) => d.createBindGroup({ layout: layoutP, entries: [
       { binding: 0, resource: { buffer: this.p0 } }, { binding: 1, resource: { buffer: fin } },
       { binding: 6, resource: { buffer: this.plist } }, { binding: 7, resource: { buffer: this.pout } }] });
     this.bgp = [bgp(this.fA), bgp(this.fB)];
-    const groups = Math.ceil(NF / 128); this.gx = Math.min(groups, 65535); this.gy = Math.ceil(groups / this.gx);
+    this.bgg = d.createBindGroup({ layout: layoutG, entries: [
+      { binding: 0, resource: { buffer: this.p0 } }, { binding: 9, resource: { buffer: this.glist } },
+      { binding: 10, resource: { buffer: this.gout } }, { binding: 11, resource: { buffer: this.acc } }] });
+    const groups = Math.ceil(NF * B / 128); this.gx = Math.min(groups, 65535); this.gy = Math.ceil(groups / this.gx);
     this.cur = 0;  // 0: aktuelle Daten in fA
   }
   async check() {
@@ -654,11 +788,20 @@ class GpuSim {
     const errs = (info.messages || []).filter((m) => m.type === "error");
     if (errs.length) throw new Error("Shader-Fehler: " + errs.map((m) => m.message).join("; "));
   }
+  curBuf() { return this.cur === 0 ? this.fA : this.fB; }
   steps(n, doacc) {
     const enc = this.d.createCommandEncoder(), pass = enc.beginComputePass();
     pass.setPipeline(this.pipeS);
     for (let s = 0; s < n; s++) { pass.setBindGroup(0, this.bg[doacc][this.cur]); pass.dispatchWorkgroups(this.gx, this.gy); this.cur ^= 1; }
     pass.end(); this.d.queue.submit([enc.finish()]);
+  }
+  setNS(ns) { this.d.queue.writeBuffer(this.ns, 0, ns); }
+  clearAcc() { const enc = this.d.createCommandEncoder(); enc.clearBuffer(this.acc); this.d.queue.submit([enc.finish()]); }
+  // Startzustand aller Varianten auf eine gespeicherte Verteilung (19*NF) setzen
+  resetFrom(base) {
+    const enc = this.d.createCommandEncoder(), sz = 19 * this.S.NF * 4;
+    for (let b = 0; b < this.B; b++) enc.copyBufferToBuffer(base, 0, this.curBuf(), b * sz, sz);
+    this.d.queue.submit([enc.finish()]);
   }
   async probe() {
     const enc = this.d.createCommandEncoder(), pass = enc.beginComputePass();
@@ -667,29 +810,48 @@ class GpuSim {
     await this.pread.mapAsync(GPUMapMode.READ); const out = new Float32Array(this.pread.getMappedRange()).slice(); this.pread.unmap();
     return out;
   }
-  async read(buf, n) {
+  async gather() {
+    const enc = this.d.createCommandEncoder(), pass = enc.beginComputePass();
+    pass.setPipeline(this.pipeG); pass.setBindGroup(0, this.bgg); pass.dispatchWorkgroups(Math.ceil(this.nl * this.B / 64)); pass.end();
+    enc.copyBufferToBuffer(this.gout, 0, this.gread, 0, this.nl * this.B * 4); this.d.queue.submit([enc.finish()]);
+    await this.gread.mapAsync(GPUMapMode.READ); const out = new Float32Array(this.gread.getMappedRange()).slice(); this.gread.unmap();
+    return out;
+  }
+  async read(buf, n, offset = 0) {
     const rb = this.d.createBuffer({ size: n * 4, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
-    const enc = this.d.createCommandEncoder(); enc.copyBufferToBuffer(buf, 0, rb, 0, n * 4); this.d.queue.submit([enc.finish()]);
+    const enc = this.d.createCommandEncoder(); enc.copyBufferToBuffer(buf, offset * 4, rb, 0, n * 4); this.d.queue.submit([enc.finish()]);
     await rb.mapAsync(GPUMapMode.READ); const out = new Float32Array(rb.getMappedRange()).slice(); rb.unmap(); rb.destroy();
     return out;
   }
-  destroy() { for (const b of [this.fA, this.fB, this.nb, this.flg, this.acc, this.plist, this.pout, this.pread, this.p0, this.p1]) b.destroy(); }
+  // aktuellen Zustand von Variante b in einen eigenen Puffer kopieren
+  snapshot(b = 0) {
+    const sz = 19 * this.S.NF * 4;
+    const buf = this.d.createBuffer({ size: sz, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
+    const enc = this.d.createCommandEncoder(); enc.copyBufferToBuffer(this.curBuf(), b * sz, buf, 0, sz); this.d.queue.submit([enc.finish()]);
+    return buf;
+  }
+  destroy() { for (const b of [this.fA, this.fB, this.nb, this.flg, this.acc, this.ns, this.plist, this.pout, this.pread, this.glist, this.gout, this.gread, this.p0, this.p1]) b.destroy(); }
 }
 
-// GPU gegen CPU pruefen: 12 Schritte vom gleichen Startzustand, Abweichung der Verteilungen
+// GPU gegen CPU pruefen: 2 Varianten (ohne und mit Einbauten), 12 Schritte vom gleichen Startzustand
 async function gpuSelfTest(dev, g, p) {
   const S = setupSim(g, p), NF = S.NF, n = 12;
-  const sim = new GpuSim(dev, S); await sim.check();
+  const ns = new Float32Array(2 * NF);
+  for (let a = 0; a < NF; a += 17) if (S.flag[a] === 0) ns[NF + a] = 1;
+  const sim = new GpuSim(dev, S, 2, ns); await sim.check();
   sim.steps(n, 0);
-  const fg = await sim.read(sim.cur === 0 ? sim.fA : sim.fB, 19 * NF); sim.destroy();
-  let f = S.f0.slice(), f2 = new Float32Array(19 * NF);
-  for (let s = 0; s < n; s++) { cpuStep(S, f, f2, null); const t = f; f = f2; f2 = t; }
-  let md = 0; for (let x = 0; x < f.length; x += 7) md = Math.max(md, Math.abs(f[x] - fg[x]));
+  const fg = await sim.read(sim.curBuf(), 19 * NF * 2); sim.destroy();
+  let md = 0;
+  for (let b = 0; b < 2; b++) {
+    let f = S.f0.slice(), f2 = new Float32Array(19 * NF); const nsb = ns.subarray(b * NF, (b + 1) * NF);
+    for (let s = 0; s < n; s++) { cpuStep(S, f, f2, null, nsb); const t = f; f = f2; f2 = t; }
+    for (let x = 0; x < f.length; x += 7) md = Math.max(md, Math.abs(f[x] - fg[b * 19 * NF + x]));
+  }
   return md;
 }
 
-async function simulateGPU(dev, g, p, onProgress) {
-  const S = setupSim(g, p), NF = S.NF, sim = new GpuSim(dev, S); await sim.check();
+async function simulateGPU(dev, g, p, onProgress, ns) {
+  const S = setupSim(g, p), NF = S.NF, sim = new GpuSim(dev, S, 1, ns); await sim.check();
   const t0 = Date.now(), hist = []; let step = 0, nacc = 0;
   const startAcc = p.steps - p.avg;
   while (step < p.steps) {
@@ -704,11 +866,12 @@ async function simulateGPU(dev, g, p, onProgress) {
   }
   const acc = await sim.read(sim.acc, 4 * NF); sim.destroy();
   for (let x = 0; x < 4 * NF; x++) acc[x] /= Math.max(nacc, 1);
-  return evaluate(g, p, acc, S.cells, S.cid, hist, S.Ain, S.Af);
+  return evaluate(g, p, acc, S.cells, S.cid, hist, S.Ain, S.Af, ns);
 }
 
-function evaluate(g, p, acc, cells, cid, hist, Ain, Af) {
-  const { nx, ny, nz, xc, dc, zc, fluid, opening, top, h } = g, NF = g.nf, u0 = p.u;
+function evaluate(g, p, acc, cells, cid, hist, Ain, Af, ns) {
+  const { nx, ny, nz, xc, dc, zc, opening, top, h } = g, NF = g.nf, u0 = p.u;
+  const fluid = ns ? g.fluid.map((v, c) => (v && !(ns[cid[c]] > 0.5) ? 1 : 0)) : g.fluid;
   const U = (c, comp) => { const a = cid[c]; return a < 0 ? NaN : acc[comp * NF + a]; };
   const idx = (i, j, k) => (i * ny + j) * nz + k;
   // Filterkarte (Mitte Faltenpaket)
@@ -762,13 +925,98 @@ function evaluate(g, p, acc, cells, cid, hist, Ain, Af) {
     },
     hist, fmap, nx, nz, ny, xc: Array.from(xc), zc: Array.from(zc), dc: Array.from(dc), pleat: g.pleat,
     planInlet: plan(jc), planLow: plan(jlow), lon,
-    frame: { dAx: g.fr.dAx, iAx: g.fr.iAx, oAx: g.fr.oAx, sd: g.fr.sd, si: g.fr.si, seal: g.fr.seal },
+    frame: { dAx: g.fr.dAx, iAx: g.fr.iAx, oAx: g.fr.oAx, sd: g.fr.sd, si: g.fr.si, seal: g.fr.seal, yaw: g.fr.yaw },
+    vol: field3d(g, p, acc, cid, fluid, pb / pbN), lines: streamlines(g, p, acc, cid, fluid),
   };
+}
+
+/* ---------------------------------------------------------------- 3D-Auswertung
+   Felder auf dem ganzen Rechengitter (NaN = keine Luft), bezogen auf den Staudruck im Einlass q = rho/2 u0^2:
+   spd  = |u| / u0
+   pst  = statischer Druck relativ zum Raum unter dem Filter
+   loss = Totaldruckverlust seit dem Einlass (wo geht Energie verloren?) */
+function field3d(g, p, acc, cid, fluid, rhoRef) {
+  const { nx, ny, nz, opening, h } = g, NF = g.nf, u0 = p.u, q = 0.5 * u0 * u0, N = nx * ny * nz;
+  const spd = new Float32Array(N).fill(NaN), pst = new Float32Array(N).fill(NaN), loss = new Float32Array(N).fill(NaN);
+  const ptot = (a) => { const ux = acc[a], uy = acc[NF + a], uz = acc[2 * NF + a]; return acc[3 * NF + a] / 3 + 0.5 * (ux * ux + uy * uy + uz * uz); };
+  // Bezug: massenstromgewichteter Totaldruck im Einlassquerschnitt, zwei Zellen vor dem Kasten.
+  // Die kuenstliche Zulaufstrecke davor wird nicht dargestellt.
+  const kB = Math.max(2, g.zc.findIndex((z) => z >= g.mn[2]) - 2);
+  let pin = 0, win = 0;
+  for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) if (opening[i * ny + j]) {
+    const c = (i * ny + j) * nz + kB, a = cid[c]; if (a < 0 || !fluid[c]) continue;
+    const w = Math.max(acc[2 * NF + a], 0); pin += w * ptot(a); win += w;
+  }
+  pin /= Math.max(win, 1e-12);
+  for (let c = 0; c < N; c++) {
+    const a = cid[c]; if (a < 0 || !fluid[c] || c % nz < kB) continue;
+    const ux = acc[a], uy = acc[NF + a], uz = acc[2 * NF + a];
+    spd[c] = Math.hypot(ux, uy, uz) / u0;
+    pst[c] = (acc[3 * NF + a] - rhoRef) / 3 / q;
+    loss[c] = (pin - ptot(a)) / q;
+  }
+  return { nx, ny, nz, h, x0: g.xc[0], d0: g.dc[0], z0: g.zc[0], spd, pst, loss, jm: g.jm, top: g.top, pleat: g.pleat, kB, zIn: g.mn[2] };
+}
+// Mittlere Stromlinien vom Einlass aus (zeitlich gemitteltes Feld, Runge-Kutta 2. Ordnung, Schritt 0,35 Zellen)
+function streamlines(g, p, acc, cid, fluid, maxSeeds = 220) {
+  const { nx, ny, nz, opening, h, xc, dc, zc, top, fr } = g, NF = g.nf, u0 = p.u;
+  const vel = (x, y, z, out) => {  // trilinear, Wandzellen = 0
+    const i0 = Math.floor(x), j0 = Math.floor(y), k0 = Math.floor(z), fx = x - i0, fy = y - j0, fz = z - k0;
+    out[0] = out[1] = out[2] = 0; let wsum = 0;
+    for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) for (let c = 0; c < 2; c++) {
+      const i = i0 + a, j = j0 + b, k = k0 + c; if (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz) continue;
+      const w = (a ? fx : 1 - fx) * (b ? fy : 1 - fy) * (c ? fz : 1 - fz), cc = (i * ny + j) * nz + k, q = cid[cc];
+      if (q < 0 || !fluid[cc]) continue;
+      out[0] += w * acc[q]; out[1] += w * acc[NF + q]; out[2] += w * acc[2 * NF + q]; wsum += w;
+    }
+    return wsum;
+  };
+  const inside = (x, y, z) => { const i = Math.round(x), j = Math.round(y), k = Math.round(z); if (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz) return false; return !!fluid[(i * ny + j) * nz + k]; };
+  // Startpunkte gleichmaessig ueber die Einlassoeffnung, kurz vor dem Kasten
+  const seeds = [], kS = Math.max(2, (zc.findIndex((z) => z >= g.mn[2]) | 0) - 3);
+  for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) if (opening[i * ny + j]) for (const [dx, dy] of [[-0.25, -0.25], [0.25, -0.25], [-0.25, 0.25], [0.25, 0.25]]) seeds.push([i + dx, j + dy, kS]);
+  const stride = Math.max(1, seeds.length / maxSeeds);
+  const pts = [], spd = [], off = [0], v1 = [0, 0, 0], v2 = [0, 0, 0], ds = 0.35;
+  for (let s = 0; s < seeds.length; s += stride) {
+    let [x, y, z] = seeds[Math.floor(s)]; const P = [], V = [];
+    for (let st = 0; st < 6000; st++) {
+      if (!inside(x, y, z) || vel(x, y, z, v1) < 0.3) break;
+      const m1 = Math.hypot(v1[0], v1[1], v1[2]); if (m1 < 0.01 * u0) break;
+      if (st % 3 === 0) { P.push(x, y, z); V.push(m1 / u0); }
+      const xm = x + 0.5 * ds * v1[0] / m1, ym = y + 0.5 * ds * v1[1] / m1, zm = z + 0.5 * ds * v1[2] / m1;
+      if (vel(xm, ym, zm, v2) < 0.3) break;
+      const m2 = Math.hypot(v2[0], v2[1], v2[2]); if (m2 < 0.01 * u0) break;
+      x += ds * v2[0] / m2; y += ds * v2[1] / m2; z += ds * v2[2] / m2;
+      if (y < top + 0.5) { P.push(x, y, z); V.push(m2 / u0); break; }  // durch den Filter auf der Reinluftseite angekommen
+    }
+    if (P.length < 6) continue;
+    for (let q = 0; q < P.length; q += 3) { const m = fr.toModel(xc[0] + P[q] * h, dc[0] + P[q + 1] * h, zc[0] + P[q + 2] * h); pts.push(m[0], m[1], m[2]); }
+    for (const v of V) spd.push(v);
+    off.push(spd.length);
+  }
+  return { pts: Float32Array.from(pts), spd: Float32Array.from(spd), off: Uint32Array.from(off) };
 }
 
 // ---------------------------------------------------------------- Worker-Anbindung
 if (typeof self !== "undefined" && typeof importScripts === "function") {
   let tris = null, geo = null, dev = null, devTried = false;
+  const getDev = async () => { if (!devTried) { devTried = true; try { dev = await gpuDevice(); } catch (err) { dev = null; } } return dev; };
+  const post = (m, tr) => self.postMessage(m, tr || []);
+  async function runSim(p) {
+    const prog = (info) => post({ type: "progress", info });
+    let res = null;
+    if (p.device !== "cpu" && await getDev()) {
+      try {
+        post({ type: "status", text: "Grafikkarte wird geprüft …" });
+        const md = await gpuSelfTest(dev, geo, p);
+        if (!(md < 1e-3)) throw new Error("Abweichung GPU/CPU " + md.toExponential(1));
+        post({ type: "status", text: "Rechnet auf der Grafikkarte (" + dev.name + ")" });
+        res = await simulateGPU(dev, geo, p, prog, null); res.device = "GPU · " + dev.name;
+      } catch (err) { post({ type: "status", text: "Grafikkarte nicht nutzbar (" + (err.message || err) + "), rechne auf dem Prozessor" }); res = null; }
+    } else if (p.device !== "cpu") post({ type: "status", text: "Keine WebGPU-Grafikkarte verfügbar, rechne auf dem Prozessor" });
+    if (!res) { res = simulate(geo, p, prog, null); res.device = "CPU"; }
+    return res;
+  }
   self.onmessage = async (e) => {
     const m = e.data;
     try {
@@ -777,40 +1025,22 @@ if (typeof self !== "undefined" && typeof importScripts === "function") {
         const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
         for (let v = 0; v < tris.length; v += 3) for (let a = 0; a < 3; a++) { mn[a] = Math.min(mn[a], tris[v + a]); mx[a] = Math.max(mx[a], tris[v + a]); }
         const copy = tris.slice();
-        self.postMessage({ type: "loaded", tris: copy, ntri: tris.length / 9, mn, mx }, [copy.buffer]);
+        post({ type: "loaded", tris: copy, ntri: tris.length / 9, mn, mx }, [copy.buffer]);
       } else if (m.type === "gpuinfo") {
-        if (!devTried) { devTried = true; try { dev = await gpuDevice(); } catch (err) { dev = null; } }
-        self.postMessage({ type: "gpuinfo", ok: !!dev, name: dev ? dev.name : "" });
+        await getDev(); post({ type: "gpuinfo", ok: !!dev, name: dev ? dev.name : "" });
       } else if (m.type === "prepare") {
         const t = Date.now();
         geo = prepare(Object.assign({ tris }, m.params));
-        self.postMessage({ type: "prepared", summary: geo.summary, ms: Date.now() - t });
+        post({ type: "prepared", summary: geo.summary, ms: Date.now() - t });
       } else if (m.type === "run") {
         if (!geo) throw new Error("Bitte zuerst die Geometrie prüfen.");
-        const p = m.params; let res = null;
-        const prog = (info) => self.postMessage({ type: "progress", info });
-        if (p.device !== "cpu") {
-          if (!devTried) { devTried = true; try { dev = await gpuDevice(); } catch (err) { dev = null; } }
-          if (dev) {
-            try {
-              self.postMessage({ type: "status", text: "Grafikkarte wird geprüft …" });
-              const md = await gpuSelfTest(dev, geo, p);
-              if (!(md < 1e-3)) throw new Error("Abweichung GPU/CPU " + md.toExponential(1));
-              self.postMessage({ type: "status", text: "Rechnet auf der Grafikkarte (" + dev.name + ")" });
-              res = await simulateGPU(dev, geo, p, prog); res.device = "GPU · " + dev.name;
-            } catch (err) {
-              self.postMessage({ type: "status", text: "Grafikkarte nicht nutzbar (" + (err.message || err) + "), rechne auf dem Prozessor" });
-              res = null;
-            }
-          } else self.postMessage({ type: "status", text: "Keine WebGPU-Grafikkarte verfügbar, rechne auf dem Prozessor" });
-        }
-        if (!res) { res = simulate(geo, p, prog); res.device = "CPU"; }
-        self.postMessage({ type: "result", res });
+        const res = await runSim(m.params), v = res.vol, L = res.lines;
+        post({ type: "result", res }, [v.spd.buffer, v.pst.buffer, v.loss.buffer, L.pts.buffer, L.spd.buffer, L.off.buffer]);
       }
-    } catch (err) { self.postMessage({ type: "error", message: err.message || String(err) }); }
+    } catch (err) { post({ type: "error", message: err.message || String(err), during: m.type }); }
   };
 }
-if (typeof module !== "undefined") module.exports = { parseSTL, prepare, simulate, setupSim, cpuStep };
+if (typeof module !== "undefined") module.exports = { parseSTL, makeFrame, prepare, setupSim, cpuStep, simulate, evaluate, field3d, streamlines };
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -838,7 +1068,8 @@ function onMsg(e) {
   } else if (m.type === "loaded") {
     if (silent) { silent = false; if (S.seal && S.inlet) prepare(); return; }
     buildMesh(m.tris, m.mn, m.mx);
-    S.bbox = { mn: m.mn, mx: m.mx }; S.seal = null; S.inlet = null; S.summary = null;
+    S.bbox = { mn: m.mn, mx: m.mx }; S.seal = null; S.inlet = null; S.summary = null; S.outlet = null;
+    S.modelId = (S.modelId || 0) + 1; clear3D();
     const f = $("modelFacts"); f.hidden = false;
     f.innerHTML = `<dt>Datei</dt><dd>${esc(stlName)}</dd><dt>Dreiecke</dt><dd>${m.ntri.toLocaleString("de-DE")}</dd>` +
       AX.map((a, i) => `<dt>${a}</dt><dd>${fmt(m.mn[i])} … ${fmt(m.mx[i])}</dd>`).join("");
@@ -857,9 +1088,9 @@ function onMsg(e) {
       `${fmt(i.mlups, 1)} Mio. Zellen/s · noch ${Math.max(0, Math.round(i.eta))} s`;
   } else if (m.type === "result") {
     S.running = false; uiRunning(false);
-    const r = m.res; r.name = `${stlName.replace(/\.stl$/i, "")} · ${fmt(lastParams.dx, 1)} mm · K ${fmt(lastParams.K, 1)}`;
+    const r = m.res; r.name = `${stlName.replace(/\.stl$/i, "")} · ${fmt(lastParams.dx, 1)} mm · K ${fmt(lastParams.K, 1)}` + (lastParams.outlet ? ` · Auslass ${lastParams.outlet}` : "");
     r.seconds = (Date.now() - runStart) / 1000;
-    S.results.push(r); S.cur = S.results.length - 1;
+    r.model = S.modelId; S.results.push(r); S.cur = S.results.length - 1;
     status("Rechnung fertig.", "ok"); renderResults();
   } else if (m.type === "error") {
     if (S.running) { S.running = false; uiRunning(false); }
@@ -892,7 +1123,7 @@ const controls = new THREE.OrbitControls(camera, canvas); controls.enableDamping
 scene.add(new THREE.HemisphereLight(0xffffff, 0x5d666e, 0.8));
 const sun = new THREE.DirectionalLight(0xffffff, 0.65); scene.add(sun);
 const grp = new THREE.Group(); scene.add(grp);
-let mesh = null, axes = null, sealViz = null, inletViz = null, openViz = null, marker = null;
+let mesh = null, axes = null, sealViz = null, inletViz = null, openViz = null, outViz = null, marker = null;
 const meshMat = new THREE.MeshStandardMaterial({ color: 0x8b959e, roughness: .75, metalness: .02, side: THREE.DoubleSide, flatShading: true });
 
 function buildMesh(tris, mn, mx) {
@@ -902,19 +1133,42 @@ function buildMesh(tris, mn, mx) {
   if (axes) grp.remove(axes);
   const size = Math.max(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]);
   axes = new THREE.AxesHelper(size * 0.25); axes.position.set(mn[0], mn[1], mn[2]); grp.add(axes);
-  const c = new THREE.Vector3((mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2, (mn[2] + mx[2]) / 2);
-  controls.target.copy(c);
-  camera.position.set(c.x + size * 1.1, c.y + size * 0.9, c.z + size * 1.3);
+  grp.quaternion.identity(); S.orientTouched = false;
   camera.near = size / 200; camera.far = size * 50; camera.updateProjectionMatrix();
+  fitView(true);
+}
+// Ansicht: Modell nur in der Darstellung drehen (Rechnung und Export bleiben in Modellkoordinaten)
+function fitView(resetDir) {
+  if (!mesh) return;
+  grp.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(mesh), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+  const size = Math.max(sz.x, sz.y, sz.z) || 100;
+  let dir = camera.position.clone().sub(controls.target);
+  if (resetDir || dir.lengthSq() < 1e-6) dir = new THREE.Vector3(1.1, 0.9, 1.3);
+  dir.normalize();
+  controls.target.copy(c);
+  camera.position.copy(c.clone().add(dir.multiplyScalar(size * 1.9)));
+  camera.up.set(0, 1, 0); camera.lookAt(c);
   sun.position.set(c.x + size, c.y + size * 2, c.z + size * 1.5);
+}
+function rotateModel(axis, deg) {
+  if (!mesh) return;
+  const v = new THREE.Vector3(axis === 0 ? 1 : 0, axis === 1 ? 1 : 0, axis === 2 ? 1 : 0);
+  grp.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(v, deg * Math.PI / 180));
+  S.orientTouched = true; fitView(false);
+}
+function filterUp() {
+  if (!mesh || !S.seal) return;
+  const n = new THREE.Vector3(); n.setComponent(S.seal.axis, S.seal.sign);
+  grp.quaternion.setFromUnitVectors(n, new THREE.Vector3(0, 1, 0)); fitView(true);
 }
 
 function clearViz(o) { if (o) { grp.remove(o); o.traverse((x) => { if (x.geometry) x.geometry.dispose(); }); } return null; }
 function updateMarkers() {
-  sealViz = clearViz(sealViz); inletViz = clearViz(inletViz); openViz = clearViz(openViz);
+  sealViz = clearViz(sealViz); inletViz = clearViz(inletViz); openViz = clearViz(openViz); outViz = clearViz(outViz);
   if (!S.bbox) return;
   const { mn, mx } = S.bbox;
-  if (S.seal) {
+  if (S.seal && !(S.summary && S.summary.filterPts)) {
     const a = S.seal.axis, pleat = +$("pleat").value || 0, dir = -S.seal.sign;
     const lo = [...mn], hi = [...mx]; lo[a] = Math.min(S.seal.coord, S.seal.coord + dir * pleat); hi[a] = Math.max(S.seal.coord, S.seal.coord + dir * pleat);
     const box = new THREE.BoxGeometry(hi[0] - lo[0] || 0.5, hi[1] - lo[1] || 0.5, hi[2] - lo[2] || 0.5);
@@ -924,11 +1178,22 @@ function updateMarkers() {
     const e = new THREE.LineSegments(new THREE.EdgesGeometry(box), new THREE.LineBasicMaterial({ color: new THREE.Color(css("--seal")) }));
     e.position.copy(m.position); sealViz.add(e); grp.add(sealViz);
   }
+  if (S.summary && S.summary.filterPts) {
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(S.summary.filterPts), 3));
+    sealViz = new THREE.Points(g, new THREE.PointsMaterial({ color: new THREE.Color(css("--seal")), size: +$("dx").value * 0.8, sizeAttenuation: true, transparent: true, opacity: .8 }));
+    grp.add(sealViz);
+  }
   if (S.summary && S.summary.openPts) {
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(S.summary.openPts), 3));
     openViz = new THREE.Points(g, new THREE.PointsMaterial({ color: new THREE.Color(css("--pick")), size: +$("dx").value, sizeAttenuation: true }));
     grp.add(openViz);
   }
+  if (S.summary && S.summary.outletPts && S.summary.outletPts.length) {
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(S.summary.outletPts), 3));
+    const ov = new THREE.Points(g, new THREE.PointsMaterial({ color: new THREE.Color(css("--accent")), size: +$("dx").value * 1.1, sizeAttenuation: true }));
+    outViz = ov; grp.add(ov);
+  }
+  if (sealViz && typeof V3D !== "undefined" && V3D.r) sealViz.visible = false;
   if (S.inlet) {
     const sz = Math.max(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]);
     inletViz = new THREE.Mesh(new THREE.SphereGeometry(sz * 0.012, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(css("--pick")) }));
@@ -947,31 +1212,58 @@ canvas.addEventListener("pointerup", (e) => {
   const pos = mesh.geometry.attributes.position, fi = hit.faceIndex * 3;
   const A = new THREE.Vector3().fromBufferAttribute(pos, fi), B = new THREE.Vector3().fromBufferAttribute(pos, fi + 1), C = new THREE.Vector3().fromBufferAttribute(pos, fi + 2);
   const n = new THREE.Vector3().subVectors(B, A).cross(new THREE.Vector3().subVectors(C, A)).normalize();
-  if (n.dot(ray.ray.direction) > 0) n.negate();
+  const ldir = ray.ray.direction.clone().applyQuaternion(grp.quaternion.clone().invert());
+  if (n.dot(ldir) > 0) n.negate();
   const comp = [n.x, n.y, n.z], axis = comp.map(Math.abs).indexOf(Math.max(...comp.map(Math.abs))), sign = Math.sign(comp[axis]);
-  const p = [hit.point.x, hit.point.y, hit.point.z];
-  if (Math.abs(comp[axis]) < 0.9) { status("Die angeklickte Fläche ist schräg. Bitte eine achsparallele Fläche wählen.", "err"); return; }
+  const lp = grp.worldToLocal(hit.point.clone()), p = [lp.x, lp.y, lp.z];
+  let yaw = 0, iaxis = axis, isign = sign;
+  if (S.pick === "inlet" && S.seal) {
+    // Einlass darf schraeg in der Dichtebene liegen (z. B. Rohr unter 37 Grad): Normale in die Ebene projizieren
+    const pc = comp.slice(); pc[S.seal.axis] = 0; const pl = Math.hypot(...pc);
+    if (pl < 0.7) { status("Die angeklickte Fläche zeigt nach oben oder unten. Bitte auf die Fläche klicken, in der die Einlassöffnung liegt.", "err"); return; }
+    const pn = pc.map((v) => v / pl), cand = [0, 1, 2].filter((a) => a !== S.seal.axis);
+    iaxis = Math.abs(pn[cand[0]]) >= Math.abs(pn[cand[1]]) ? cand[0] : cand[1]; isign = Math.sign(pn[iaxis]);
+    const oAx = 3 - S.seal.axis - iaxis, a = pn[oAx], b = -isign * pn[iaxis];
+    yaw = Math.atan2(a, -b) * 180 / Math.PI; if (Math.abs(yaw) < 2) yaw = 0; else yaw = Math.round(yaw * 10) / 10;
+  }
+  if (Math.abs(comp[axis]) < 0.9 && S.pick !== "outlet" && S.pick !== "inlet") { status("Die angeklickte Fläche ist schräg. Bitte eine achsparallele Fläche wählen.", "err"); return; }
+  if (S.pick === "outlet") {
+    if (!S.seal) return;
+    const q = p.slice(); q[S.seal.axis] = S.seal.coord;
+    S.outlet = q; outText(); setPick(null); status(""); updateMarkers(); if (S.inlet) prepare(); return;
+  }
   if (S.pick === "seal") {
     S.seal = { axis, sign, coord: Math.round(p[axis] * 10) / 10 };
     $("sealCoord").value = S.seal.coord; sealText(); setStep("s2", "done"); setStep("s3", S.inlet ? "done" : "open");
+    if (!S.orientTouched) filterUp();
   } else {
-    if (S.seal && axis === S.seal.axis) { status("Der Einlass muss auf einer anderen Seite liegen als die Filterebene.", "err"); return; }
-    S.inlet = { axis, sign, point: p };
-    $("inletInfo").textContent = `Seite ${sign > 0 ? "+" : "−"}${AX[axis]} · Klick bei ${p.map((v) => fmt(v, 0)).join(" / ")}`;
-    setStep("s3", "done");
+    if (S.seal && iaxis === S.seal.axis) { status("Der Einlass muss auf einer anderen Seite liegen als die Filterebene.", "err"); return; }
+    S.inlet = { axis: iaxis, sign: isign, point: p, yaw };
+    $("inletInfo").textContent = `Seite ${isign > 0 ? "+" : "−"}${AX[iaxis]}${yaw ? ` · schräg, ${fmt(Math.abs(yaw), 1)}° gedreht` : ""} · Klick bei ${p.map((v) => fmt(v, 0)).join(" / ")}`;
+    setStep("s3", "done"); setStep("s3b", "open");
   }
   setPick(null); status(""); updateMarkers();
   if (S.seal && S.inlet) prepare();
 });
 function setPick(mode) {
   S.pick = mode;
-  $("pickSeal").setAttribute("aria-pressed", mode === "seal"); $("pickInlet").setAttribute("aria-pressed", mode === "inlet");
+  $("pickSeal").setAttribute("aria-pressed", mode === "seal"); $("pickInlet").setAttribute("aria-pressed", mode === "inlet"); $("pickOutlet").setAttribute("aria-pressed", mode === "outlet");
   const v = $("vmode"); v.classList.toggle("pickmode", !!mode);
-  v.textContent = mode === "seal" ? "Klicke auf die Dichtfläche des Filters" : mode === "inlet" ? "Klicke auf die Außenwand am Einlass" : "Ziehen = drehen · Scrollen = zoomen · Rechtsklick = verschieben";
+  v.textContent = mode === "seal" ? "Klicke auf die Dichtfläche des Filters" : mode === "inlet" ? "Klicke auf die Fläche, in der die Einlassöffnung liegt (bei schrägem Rohr: auf den Rohrrand)" : mode === "outlet" ? "Klicke auf den Flansch oder in den Kasten, wo der Auslass sitzt" : "Ziehen = drehen · Scrollen = zoomen · Rechtsklick = verschieben";
   canvas.style.cursor = mode ? "crosshair" : "";
 }
 $("pickSeal").addEventListener("click", () => { if (mesh) setPick(S.pick === "seal" ? null : "seal"); });
 $("pickInlet").addEventListener("click", () => { if (mesh && S.seal) setPick(S.pick === "inlet" ? null : "inlet"); });
+$("pickOutlet").addEventListener("click", () => { if (mesh && S.seal) setPick(S.pick === "outlet" ? null : "outlet"); });
+function outText() {
+  const on = $("outOn").checked;
+  ["pickOutlet", "outD", "outH"].forEach((id) => { $(id).disabled = !on; });
+  $("outInfo").textContent = !on ? "Ohne Auslass (gleichmäßige Absaugung)" : S.outlet
+    ? `Auslass Ø ${fmt(+$("outD").value, 0)} mm bei ${S.outlet.map((v) => fmt(v, 0)).join(" / ")} · Deckelraum ${fmt(+$("outH").value, 0)} mm` : "Lage noch nicht gewählt";
+  setStep("s3b", on && S.outlet ? "done" : (S.inlet ? "open" : "locked"));
+}
+$("outOn").addEventListener("change", () => { outText(); updateMarkers(); if (S.seal && S.inlet && (!$("outOn").checked || S.outlet)) prepare(); });
+["outD", "outH"].forEach((id) => $(id).addEventListener("change", () => { outText(); if (S.seal && S.inlet && S.outlet) prepare(); }));
 function sealText() {
   if (!S.seal) return;
   $("sealInfo").textContent = `Ebene ${AX[S.seal.axis]} = ${fmt(S.seal.coord)} mm · Kasten liegt in ${S.seal.sign > 0 ? "−" : "+"}${AX[S.seal.axis]}`;
@@ -983,9 +1275,11 @@ $("filterType").addEventListener("change", () => { $("K").value = $("filterType"
 
 function prepare() {
   if (S.running) return;
+  if (V3D.r) clear3D();
   S.summary = null; $("run").disabled = true; status("Geometrie wird geprüft …");
   worker.postMessage({ type: "prepare", params: { dx: +$("dx").value, sealAxis: S.seal.axis, sealSign: S.seal.sign, seal: S.seal.coord,
-    inletAxis: S.inlet.axis, inletSign: S.inlet.sign, click: S.inlet.point, pleat: +$("pleat").value } });
+    inletAxis: S.inlet.axis, inletSign: S.inlet.sign, inletYaw: S.inlet.yaw || 0, click: S.inlet.point, pleat: +$("pleat").value,
+    outlet: $("outOn").checked && S.outlet ? { enabled: true, center: S.outlet, diameter: +$("outD").value, height: +$("outH").value } : null } });
 }
 function showGeo(s) {
   const f = $("geoFacts"); f.hidden = false;
@@ -996,7 +1290,7 @@ function showGeo(s) {
   if (!s.pleatOk) warn.push("Faltentiefe ist kleiner als eine Zelle.");
   if (s.filter_cm2 < 20) warn.push("Filterfläche sehr klein – Dichtebene prüfen.");
   if (s.outlet_cm2 > s.filter_cm2 * 1.6) warn.push("Auslassfläche deutlich größer als die Filterfläche – ist der Kasten dicht?");
-  status(warn.length ? warn.join(" ") : "Geometrie in Ordnung. Die grünen Punkte zeigen die erkannte Einlassöffnung.", warn.length ? "err" : "ok");
+  status(warn.length ? warn.join(" ") : "Geometrie in Ordnung. Grün: erkannte Einlassöffnung. Gelb: Filterfläche, mit der gerechnet wird (Innenquerschnitt in halber Faltentiefe). Orange: Auslass.", warn.length ? "err" : "ok");
   setStep("s4", "open"); $("run").disabled = false; updateMarkers();
 }
 
@@ -1009,6 +1303,7 @@ $("run").addEventListener("click", () => {
   if (!S.summary) return;
   const steps = Math.max(500, +$("steps").value);
   lastParams = { device: $("device").value, K: +$("K").value, aniso: +$("aniso").value, u: +$("u").value, tau: Math.max(0.502, +$("tau").value),
+    outlet: $("outOn").checked && S.outlet ? S.outlet.map((v) => fmt(v, 0)).join("/") : "",
     steps, avg: Math.round(steps / 3), every: Math.max(100, Math.round(steps / 40 / 50) * 50), dx: +$("dx").value };
   S.running = true; runStart = Date.now(); uiRunning(true); $("barFill").style.width = "0%"; $("progText").textContent = "Startet …";
   worker.postMessage({ type: "run", params: lastParams });
@@ -1039,7 +1334,7 @@ function drawMap(cv, o) {
   const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
   const img = new ImageData(o.n1, o.n2);
   for (let a = 0; a < o.n1; a++) for (let b = 0; b < o.n2; b++) {
-    const v = o.val(a, b), row = o.flipY ? b : o.n2 - 1 - b, p = (row * o.n1 + a) * 4;
+    const v = o.val(a, b), row = o.flipY ? b : o.n2 - 1 - b, p = (row * o.n1 + (o.flipX ? o.n1 - 1 - a : a)) * 4;
     if (Number.isNaN(v)) { img.data[p + 3] = 0; continue; }
     const c = cmap(o.stops, o.t(v)); img.data[p] = c[0]; img.data[p + 1] = c[1]; img.data[p + 2] = c[2]; img.data[p + 3] = 255;
   }
@@ -1051,8 +1346,8 @@ function drawMap(cv, o) {
     for (let a = Math.floor(st / 2); a < o.n1; a += st) for (let b = Math.floor(st / 2); b < o.n2; b += st) {
       const v = o.vec(a, b); if (!v || Number.isNaN(v[0])) continue;
       const len = Math.hypot(v[0], v[1]); if (len < 0.02) continue;
-      const L = Math.min(1, len) * st * cell * 0.85, dxv = v[0] / len * L, dyv = (o.flipY ? 1 : -1) * v[1] / len * L;
-      const x0 = ml + (a + 0.5) * cell - dxv / 2, y0 = mt + ((o.flipY ? b : o.n2 - 1 - b) + 0.5) * cell - dyv / 2;
+      const L = Math.min(1, len) * st * cell * 0.85, dxv = (o.flipX ? -1 : 1) * v[0] / len * L, dyv = (o.flipY ? 1 : -1) * v[1] / len * L;
+      const x0 = ml + ((o.flipX ? o.n1 - 1 - a : a) + 0.5) * cell - dxv / 2, y0 = mt + ((o.flipY ? b : o.n2 - 1 - b) + 0.5) * cell - dyv / 2;
       ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + dxv, y0 + dyv);
       const ang = Math.atan2(dyv, dxv), hl = Math.min(4, L * 0.4);
       ctx.lineTo(x0 + dxv - hl * Math.cos(ang - 0.5), y0 + dyv - hl * Math.sin(ang - 0.5));
@@ -1063,7 +1358,7 @@ function drawMap(cv, o) {
   const fg = css("--muted"); ctx.fillStyle = fg; ctx.strokeStyle = css("--line"); ctx.font = `11px ${css("--f-mono")}`;
   ctx.strokeRect(ml, mt, pw, ph);
   ctx.textAlign = "center"; ctx.textBaseline = "top";
-  for (const t of o.ticks1) { const x = ml + (t.at + 0.5) * cell; ctx.fillText(t.label, x, mt + ph + 4); ctx.beginPath(); ctx.moveTo(x, mt + ph); ctx.lineTo(x, mt + ph + 3); ctx.stroke(); }
+  for (const t of o.ticks1) { const x = ml + ((o.flipX ? o.n1 - 1 - t.at : t.at) + 0.5) * cell; ctx.fillText(t.label, x, mt + ph + 4); ctx.beginPath(); ctx.moveTo(x, mt + ph); ctx.lineTo(x, mt + ph + 3); ctx.stroke(); }
   ctx.textAlign = "right"; ctx.textBaseline = "middle";
   for (const t of o.ticks2) { const y = mt + ((o.flipY ? t.at : o.n2 - 1 - t.at) + 0.5) * cell; ctx.fillText(t.label, ml - 5, y); ctx.beginPath(); ctx.moveTo(ml - 3, y); ctx.lineTo(ml, y); ctx.stroke(); }
   ctx.font = `12px ${css("--f-body")}`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
@@ -1090,6 +1385,7 @@ const tDiv = (v) => (v <= 1 ? v * 0.5 : 0.5 + (v - 1) / 1.5 * 0.5);
 function renderResults() {
   const r = S.results[S.cur]; if (!r) return;
   $("results").hidden = false;
+  if (r.model === S.modelId) show3D(r); else clear3D();
   const M = r.metrics, fr = r.frame;
   const verdict = M.gammaCore >= 0.95 ? ["sehr gleichmäßig", "good"] : M.gammaCore >= 0.9 ? ["gut", "good"] : M.gammaCore >= 0.8 ? ["mäßig", "warn"] : ["ungleichmäßig", "bad"];
   $("resMeta").textContent = `${r.name} · ${r.device} · ${fmt(r.seconds, 0)} s`;
@@ -1098,19 +1394,24 @@ function renderResults() {
     `<div class="kpi"><span>Filterfläche unter 50 %</span><b>${fmt(M.lowCore * 100, 1)} %</b><span>Strahlzonen über 150 %: ${fmt(M.highCore * 100, 1)} %</span></div>` +
     `<div class="kpi"><span>Höchste Anströmung</span><b>${fmt(M.maxToMean, 2)} ×</b><span>des Mittelwerts</span></div>` +
     `<div class="kpi"><span>Verlustbeiwert Rohluftseite ζ</span><b>${fmt(M.zeta, 2)}</b><span>× Staudruck im Einlass</span></div>`;
-  const xl = `${AX[fr.oAx]} [mm]`, zl = `${AX[fr.iAx]} [mm]`;
+  const rot = fr.yaw ? "′" : "", xl = `${AX[fr.oAx]}${rot} [mm]`, zl = `${AX[fr.iAx]}${rot} [mm]` + (fr.yaw ? ` · Gitter ${fmt(Math.abs(fr.yaw), 1)}° gedreht (Rohrachse)` : "");
   const mapZ = (z) => -fr.si * z;
   const t1 = ticks(r.xc, (x) => x), t2 = ticks(r.zc, mapZ);
-  drawMap($("m1"), { n1: r.nx, n2: r.nz, val: (i, k) => r.fmap[i * r.nz + k], t: tDiv, stops: DIV, ticks1: t1, ticks2: t2, xlabel: xl, ylabel: zl,
+  // Draufsichten immer so, wie man von der Filterseite in den Kasten schaut (nicht gespiegelt)
+  const dirM = (X, D, Z) => { const y = (fr.yaw || 0) * Math.PI / 180, cy = Math.cos(y), sy = Math.sin(y), q = [0, 0, 0];
+    q[fr.oAx] = cy * X - sy * Z; q[fr.dAx] = -fr.sd * D; q[fr.iAx] = -fr.si * (sy * X + cy * Z); return q; };
+  const ex = dirM(1, 0, 0), ez = dirM(0, 0, 1), up = dirM(0, -1, 0);
+  const flipX = ((ex[1] * ez[2] - ex[2] * ez[1]) * up[0] + (ex[2] * ez[0] - ex[0] * ez[2]) * up[1] + (ex[0] * ez[1] - ex[1] * ez[0]) * up[2]) < 0;
+  drawMap($("m1"), { n1: r.nx, n2: r.nz, flipX, val: (i, k) => r.fmap[i * r.nz + k], t: tDiv, stops: DIV, ticks1: t1, ticks2: t2, xlabel: xl, ylabel: zl,
     cbar: [[0, "0"], [0.5, "1,0"], [tDiv(1.5), "1,5"], [1, "2,5"]] });
   const sp = (pl, vmax, id, sub, txt) => {
     $(sub).textContent = txt;
-    drawMap($(id), { n1: pl.n1, n2: pl.n2, val: (i, k) => pl.speed[i * pl.n2 + k], vec: (i, k) => [pl.ua[i * pl.n2 + k], pl.ub[i * pl.n2 + k]],
+    drawMap($(id), { n1: pl.n1, n2: pl.n2, flipX, val: (i, k) => pl.speed[i * pl.n2 + k], vec: (i, k) => [pl.ua[i * pl.n2 + k], pl.ub[i * pl.n2 + k]],
       t: (v) => v / vmax, stops: SEQ, ticks1: t1, ticks2: t2, xlabel: xl, ylabel: zl, cbar: [[0, "0"], [0.5, fmt(vmax / 2, 1)], [1, fmt(vmax, 1)]] });
   };
-  sp(r.planInlet, 1.2, "m2", "m2s", `Tiefe ${fmt(r.planInlet.depth, 0)} mm unter der Dichtebene · Betrag relativ zur Einlassgeschwindigkeit`);
-  sp(r.planLow, 0.8, "m3", "m3s", `Tiefe ${fmt(r.planLow.depth, 0)} mm (12 mm unter den Falten) · zeigt, welche Bereiche den Filter speisen`);
-  const L = r.lon; $("m4s").textContent = `${AX[fr.oAx]} = ${fmt(L.x, 0)} mm · Einlass links, Faltenzone oben`;
+  sp(r.planInlet, 1.2, "m2", "m2s", `Tiefe ${fmt(r.planInlet.depth, 0)} mm unter der Dichtebene · Betrag relativ zur Einlassgeschwindigkeit · Blick von der Filterseite`);
+  sp(r.planLow, 0.8, "m3", "m3s", `Tiefe ${fmt(r.planLow.depth, 0)} mm (12 mm unter den Falten) · zeigt, welche Bereiche den Filter speisen · Blick von der Filterseite`);
+  const L = r.lon; $("m4s").textContent = `${AX[fr.oAx]}${rot} = ${fmt(L.x, 0)} mm · Einlass links, Faltenzone oben`;
   drawMap($("m4"), { n1: L.n1, n2: L.n2, flipY: true, val: (k, j) => L.speed[k * L.n2 + j], vec: (k, j) => [L.ua[k * L.n2 + j], -L.ub[k * L.n2 + j]],
     t: (v) => v / 1.2, stops: SEQ, ticks1: ticks(r.zc, mapZ), ticks2: ticks(r.dc, (d) => d), xlabel: zl, ylabel: "Tiefe ab Dichtebene [mm]",
     cbar: [[0, "0"], [0.5, "0,6"], [1, "1,2"]] });
@@ -1128,6 +1429,163 @@ function calc() {
 }
 $("ps").addEventListener("input", calc);
 
+
+// ---------------- 3D-Ergebnis: Stromlinien, Schnittebene, Filteranströmung
+const LOSS = [[0, [246, 244, 236]], [0.3, [243, 196, 98]], [0.65, [212, 98, 44]], [1, [104, 26, 44]]];
+const QTY = {
+  spd: { name: "Geschwindigkeit", stops: SEQ, unit: (v) => fmt(v, 1) + " ×" },
+  loss: { name: "Totaldruckverlust seit Einlass", stops: LOSS, unit: (v) => fmt(v, 1) + " q" },
+  pst: { name: "Statischer Druck (0 = unter dem Filter)", stops: DIV, unit: (v) => (v > 0 ? "+" : "") + fmt(v, 1) + " q" },
+  filt: { name: "Filteranströmung, relativ zum Mittel", stops: DIV, unit: (v) => fmt(v, 1) + " ×" },
+};
+const V3D = { r: null, lines: null, slice: null, parts: null, ps: null, t0: 0 };
+function frameOf(f) {
+  const yaw = (f.yaw || 0) * Math.PI / 180, cy = Math.cos(yaw), sy = Math.sin(yaw);
+  return (X, D, Z) => { const q = [0, 0, 0]; q[f.oAx] = cy * X - sy * Z; q[f.dAx] = f.seal - f.sd * D; q[f.iAx] = -f.si * (sy * X + cy * Z); return q; };
+}
+// Wertebereiche je Rechnung (Druckgrößen aus dem Raum unter dem Filter, damit der Filter selbst die Skala nicht erdrückt)
+function ranges3D(r) {
+  if (r.vol.rng) return r.vol.rng;
+  const v = r.vol, L = [], P = [];
+  for (let i = 0; i < v.nx; i++) for (let j = v.jm; j < v.ny; j++) for (let k = v.kB; k < v.nz; k += 1) {
+    const c = (i * v.ny + j) * v.nz + k, d = v.d0 + j * v.h; if (d <= v.pleat || v.loss[c] !== v.loss[c]) continue;
+    L.push(v.loss[c]); P.push(v.pst[c]);
+  }
+  const pick = (a, q) => { if (!a.length) return 1; a.sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(q * a.length))]; };
+  const lmax = Math.max(0.5, pick(L.slice(), 0.98)), pm = Math.max(0.2, Math.abs(pick(P.slice(), 0.02)), Math.abs(pick(P.slice(), 0.98)));
+  v.rng = { spd: [0, 1.2], loss: [0, lmax], pst: [-pm, pm], filt: [0, 2.5] };
+  return v.rng;
+}
+function sliceInfo(r) {
+  const v = r.vol, dir = $("vQty").value === "filt" ? "d" : $("vDir").value;
+  const lo = dir === "d" ? v.top + 1 : dir === "x" ? 0 : v.kB, hi = (dir === "d" ? v.ny : dir === "x" ? v.nx : v.nz) - 1;
+  return { dir, lo, hi };
+}
+function setSliceRange(r, keep) {
+  const s = sliceInfo(r), el = $("vPos"), v = r.vol;
+  el.min = s.lo; el.max = s.hi; el.disabled = $("vQty").value === "filt";
+  if (!keep) {
+    if (s.dir === "d") el.value = Math.min(s.hi, Math.max(s.lo, Math.round((v.pleat + 12 - v.d0) / v.h)));
+    else if (s.dir === "x") { const P = r.lon && r.lon.x; el.value = P !== undefined ? Math.round((P - v.x0) / v.h) : Math.round((s.lo + s.hi) / 2); }
+    else el.value = Math.min(s.hi, s.lo + Math.round(40 / v.h));
+  }
+  if ($("vQty").value === "filt") el.value = v.jm;
+}
+function clear3D() {
+  for (const k of ["lines", "slice", "parts"]) V3D[k] = clearViz(V3D[k]);
+  V3D.r = null; V3D.ps = null; $("viz").hidden = true; $("legend3d").hidden = true; setHousing();
+}
+function setHousing() {
+  if (!mesh) return;
+  const m = V3D.r ? $("vHousing").value : "solid";
+  mesh.visible = m !== "off";
+  meshMat.transparent = m === "glass"; meshMat.opacity = m === "glass" ? 0.16 : 1; meshMat.depthWrite = m !== "glass"; meshMat.needsUpdate = true;
+  if (sealViz) sealViz.visible = !V3D.r;
+}
+function show3D(r) {
+  if (!r || !r.vol || !mesh) return;
+  const fresh = V3D.r !== r; V3D.r = r; $("viz").hidden = false;
+  if (fresh) setSliceRange(r, false);
+  buildLines(); buildSlice(); setHousing();
+}
+function buildLines() {
+  V3D.lines = clearViz(V3D.lines); V3D.parts = clearViz(V3D.parts); V3D.ps = null;
+  const r = V3D.r; if (!r || !$("vLines").checked) return;
+  const L = r.lines, nl = L.off.length - 1; let ns = 0;
+  for (let l = 0; l < nl; l++) ns += Math.max(0, L.off[l + 1] - L.off[l] - 1);
+  const pos = new Float32Array(ns * 6), col = new Float32Array(ns * 6); let q = 0;
+  for (let l = 0; l < nl; l++) for (let p = L.off[l]; p < L.off[l + 1] - 1; p++) for (const s of [p, p + 1]) {
+    pos.set(L.pts.subarray(3 * s, 3 * s + 3), q * 3); const c = cmap(SEQ, 0.12 + 0.88 * L.spd[s] / 1.2); col.set([c[0] / 255, c[1] / 255, c[2] / 255], q * 3); q++;
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  V3D.lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: $("vMove").checked ? 0.35 : 0.9 }));
+  grp.add(V3D.lines);
+  if ($("vMove").checked) {
+    // Je Stromlinie drei Teilchen, Fortschritt proportional zur örtlichen Geschwindigkeit
+    const np = nl * 3, pp = new Float32Array(np * 3), state = new Float32Array(np);
+    for (let i = 0; i < np; i++) state[i] = (i % 3) / 3;
+    const g2 = new THREE.BufferGeometry(); g2.setAttribute("position", new THREE.BufferAttribute(pp, 3));
+    const sz = Math.max(S.bbox.mx[0] - S.bbox.mn[0], S.bbox.mx[1] - S.bbox.mn[1], S.bbox.mx[2] - S.bbox.mn[2]);
+    V3D.parts = new THREE.Points(g2, new THREE.PointsMaterial({ color: new THREE.Color(css("--fg")), size: sz * 0.008, sizeAttenuation: true }));
+    V3D.ps = { state, nl, pp }; grp.add(V3D.parts); V3D.t0 = performance.now();
+  }
+}
+function animate3D() {
+  const P = V3D.ps, r = V3D.r; if (!P || !r) return;
+  const now = performance.now(), dt = Math.min(0.1, (now - V3D.t0) / 1000); V3D.t0 = now;
+  const L = r.lines;
+  for (let i = 0; i < P.state.length; i++) {
+    const l = Math.floor(i / 3), a = L.off[l], n = L.off[l + 1] - a; if (n < 2) continue;
+    const s = P.state[i] * (n - 1), p = Math.min(n - 2, Math.floor(s)), f = s - p, sp = L.spd[a + p];
+    P.state[i] = (P.state[i] + dt * (0.15 + sp) * 14 / n) % 1;
+    for (let c = 0; c < 3; c++) P.pp[3 * i + c] = L.pts[3 * (a + p) + c] * (1 - f) + L.pts[3 * (a + p + 1) + c] * f;
+  }
+  V3D.parts.geometry.attributes.position.needsUpdate = true;
+}
+function buildSlice() {
+  V3D.slice = clearViz(V3D.slice);
+  const r = V3D.r; if (!r) return;
+  const qty = $("vQty").value, Q = QTY[qty], rg = ranges3D(r)[qty], v = r.vol, s = sliceInfo(r), idx = +$("vPos").value;
+  drawLegend(Q, rg, qty);
+  if (!$("vSlice").checked && qty !== "filt") { posText(r, s.dir, idx); return; }
+  const W = s.dir === "x" ? v.nz : v.nx, H = s.dir === "d" ? v.nz : v.ny, data = new Uint8Array(W * H * 4);
+  const tf = qty === "filt" ? tDiv : (x) => (x - rg[0]) / (rg[1] - rg[0]);
+  for (let a = 0; a < W; a++) for (let b = 0; b < H; b++) {
+    let val;
+    if (qty === "filt") val = r.fmap[a * v.nz + b];
+    else {
+      const [i, j, k] = s.dir === "d" ? [a, idx, b] : s.dir === "x" ? [idx, b, a] : [a, b, idx];
+      val = v[qty][(i * v.ny + j) * v.nz + k];
+    }
+    if (val !== val) continue;
+    const c = cmap(Q.stops, tf(val)), o = (b * W + a) * 4; data[o] = c[0]; data[o + 1] = c[1]; data[o + 2] = c[2]; data[o + 3] = 235;
+  }
+  const tex = new THREE.DataTexture(data, W, H, THREE.RGBAFormat); tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.needsUpdate = true;
+  const M = frameOf(r.frame), h = v.h, xa = v.x0 - h / 2, xb = v.x0 + (v.nx - 0.5) * h, za = v.z0 - h / 2, zb = v.z0 + (v.nz - 0.5) * h, da = v.d0 - h / 2, db = v.d0 + (v.ny - 0.5) * h;
+  const j = qty === "filt" ? v.jm : idx;
+  const P = s.dir === "d" ? [M(xa, v.d0 + j * h, za), M(xb, v.d0 + j * h, za), M(xb, v.d0 + j * h, zb), M(xa, v.d0 + j * h, zb)]
+    : s.dir === "x" ? [M(v.x0 + idx * h, da, za), M(v.x0 + idx * h, da, zb), M(v.x0 + idx * h, db, zb), M(v.x0 + idx * h, db, za)]
+    : [M(xa, da, v.z0 + idx * h), M(xb, da, v.z0 + idx * h), M(xb, db, v.z0 + idx * h), M(xa, db, v.z0 + idx * h)];
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(P.flat()), 3));
+  g.setAttribute("uv", new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2));
+  g.setIndex([0, 1, 2, 0, 2, 3]);
+  V3D.slice = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+  grp.add(V3D.slice); posText(r, s.dir, j);
+}
+function posText(r, dir, idx) {
+  const v = r.vol, rot = r.frame.yaw ? "′" : "";
+  $("vPosT").textContent = $("vQty").value === "filt" ? `Mitte Faltenpaket, ${fmt(v.d0 + v.jm * v.h, 0)} mm unter der Dichtebene`
+    : dir === "d" ? `${fmt(v.d0 + idx * v.h, 0)} mm unter der Dichtebene` + (v.d0 + idx * v.h <= v.pleat ? " (im Faltenpaket)" : "")
+    : dir === "x" ? `${AX[r.frame.oAx]}${rot} = ${fmt(v.x0 + idx * v.h, 0)} mm`
+    : `${fmt(v.z0 + idx * v.h - v.zIn, 0)} mm hinter der Einlassöffnung`;
+}
+function drawLegend(Q, rg, qty) {
+  const lg = $("legend3d"); lg.hidden = false; $("lgName").textContent = Q.name;
+  const cv = $("lgBar"), c = cv.getContext("2d");
+  for (let x = 0; x < cv.width; x++) { const t = x / (cv.width - 1), col = cmap(Q.stops, t); c.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`; c.fillRect(x, 0, 1, cv.height); }
+  if (qty === "filt") { $("lgMin").textContent = "0"; $("lgMid").textContent = "1,0"; $("lgMax").textContent = "2,5 ×"; return; }
+  $("lgMin").textContent = Q.unit(rg[0]); $("lgMid").textContent = Q.unit((rg[0] + rg[1]) / 2); $("lgMax").textContent = Q.unit(rg[1]);
+}
+$("vLines").addEventListener("change", buildLines);
+$("vMove").addEventListener("change", buildLines);
+$("vSlice").addEventListener("change", buildSlice);
+$("vHousing").addEventListener("change", setHousing);
+$("vQty").addEventListener("change", () => { if (V3D.r) { setSliceRange(V3D.r, $("vQty").value !== "filt" && $("vDir").value === sliceInfo(V3D.r).dir); buildSlice(); } });
+$("vDir").addEventListener("change", () => { if (V3D.r) { setSliceRange(V3D.r, false); buildSlice(); } });
+$("vPos").addEventListener("input", () => { if (V3D.r) buildSlice(); });
+try { if (matchMedia("(prefers-reduced-motion: reduce)").matches) $("vMove").checked = false; } catch (e) { }
+
+// ---------------- Ansicht drehen
+$("vRotX").addEventListener("click", () => rotateModel(0, 90));
+$("vRotY").addEventListener("click", () => rotateModel(1, 90));
+$("vRotZ").addEventListener("click", () => rotateModel(2, 90));
+$("vFlip").addEventListener("click", () => rotateModel(0, 180));
+$("vReset").addEventListener("click", () => { if (!mesh) return; grp.quaternion.identity(); S.orientTouched = true; fitView(true); });
+$("vFit").addEventListener("click", () => fitView(false));
+$("vFilterUp").addEventListener("click", () => { S.orientTouched = true; filterUp(); });
+
+
 // ---------------- Theme & Schleife
 function applyTheme() { scene.background = new THREE.Color(css("--stage")); updateMarkers(); if (S.cur >= 0) renderResults(); }
 applyTheme();
@@ -1139,7 +1597,7 @@ function loop() {
   if (canvas.width !== Math.floor(w * renderer.getPixelRatio()) || canvas.height !== Math.floor(h * renderer.getPixelRatio())) {
     renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
   }
-  controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop);
+  animate3D(); controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop);
 }
 loop();
 </script>
